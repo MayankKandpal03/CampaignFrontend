@@ -1,14 +1,10 @@
 /*
  * it.css — IT Dashboard styles.
  *
- * Previously injected as a JavaScript template literal string (`const STYLES = \`...\``)
- * rendered inside a <style> tag in ITDashboard.jsx.
- *
- * Moving to a real CSS file:
- *  - Allows browser caching
- *  - Enables linting and IDE support
- *  - Removes ~220 lines of a string from the component file
- *  - Prevents re-injection on every render
+ * FIX: Removed all `display: none` rules on table columns at breakpoints.
+ * Previously hid columns 3+4 at ≤768px and column 2 at ≤480px.
+ * Tables now use horizontal scroll (overflow-x: auto on .table-wrap)
+ * so all columns remain visible on every screen size.
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -62,7 +58,6 @@
   transition: transform 0.28s cubic-bezier(.4,0,.2,1);
   overflow-y: auto;
 }
-.it-sidebar.hidden { transform: translateX(-100%); }
 
 .sidebar-overlay {
   display: none;
@@ -107,20 +102,20 @@
 
 /* ── Main ── */
 .it-main    { flex: 1; margin-left: var(--sidebar-w); display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.28s cubic-bezier(.4,0,.2,1); }
-.it-header  { position: sticky; top: 0; z-index: 100; height: var(--header-h); background: rgba(245,244,240,0.92); border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); display: flex; align-items: center; padding: 0 28px; gap: 16px; }
+.it-header  { position: sticky; top: 0; z-index: 100; height: var(--header-h); background: rgba(245,244,240,0.92); border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); display: flex; align-items: center; padding: 0 28px; gap: 16px; flex-wrap: wrap; }
 .hamburger  { display: none; flex-direction: column; gap: 5px; cursor: pointer; padding: 4px; border: none; background: none; }
 .hamburger span { display: block; width: 20px; height: 2px; background: var(--ink); border-radius: 2px; transition: all 0.2s; }
 .header-title  { font-family: var(--ff-display); font-size: 18px; font-weight: 500; color: var(--text); flex: 1; }
-.header-badge  { font-family: var(--ff-mono); font-size: 10px; padding: 3px 10px; border-radius: 99px; background: var(--accent-lt); color: var(--accent); letter-spacing: 0.05em; }
-.notif-bell    { position: relative; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.15s; }
+.header-badge  { font-family: var(--ff-mono); font-size: 10px; padding: 3px 10px; border-radius: 99px; background: var(--accent-lt); color: var(--accent); letter-spacing: 0.05em; white-space: nowrap; }
+.notif-bell    { position: relative; width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.15s; flex-shrink: 0; }
 .notif-bell:hover { background: var(--surface2); }
 .notif-dot     { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--danger); border: 1.5px solid var(--bg); }
 
 /* ── Content ── */
-.it-content { padding: 28px; flex: 1; max-width: 1100px; }
+.it-content { padding: 28px; flex: 1; max-width: 1200px; }
 
 /* ── Stat Cards ── */
-.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
 .stat-card  { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
 .stat-label { font-size: 11px; font-family: var(--ff-mono); color: var(--muted); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 6px; }
 .stat-value { font-family: var(--ff-display); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
@@ -132,22 +127,32 @@
 .refresh-btn   { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; transition: all 0.15s; font-family: var(--ff-body); }
 .refresh-btn:hover { border-color: var(--border2); color: var(--ink); background: var(--surface2); }
 
-/* ── Table ── */
-.table-wrap  { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+/* ── Table ──
+ * FIX: overflow-x: auto on .table-wrap ensures all columns remain visible
+ * on small screens via horizontal scroll instead of hiding columns.
+ */
+.table-wrap  {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  overflow-x: auto;          /* horizontal scroll instead of hiding columns */
+  -webkit-overflow-scrolling: touch;
+}
 .table-empty { padding: 48px 24px; text-align: center; }
 .table-empty-icon { font-size: 32px; margin-bottom: 10px; }
 .table-empty-text { font-size: 14px; color: var(--muted); }
 
-table         { width: 100%; border-collapse: collapse; }
+table         { width: 100%; border-collapse: collapse; min-width: 700px; } /* min-width ensures all cols visible */
 thead tr      { border-bottom: 1px solid var(--border); background: var(--surface2); }
-th            { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); padding: 12px 16px; text-align: left; font-weight: 400; }
+th            { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); padding: 12px 16px; text-align: left; font-weight: 400; white-space: nowrap; }
 tbody tr      { border-bottom: 1px solid var(--border); transition: background 0.12s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--surface2); }
 td            { padding: 14px 16px; font-size: 13px; color: var(--ink); vertical-align: middle; }
 
 /* ── Badges ── */
-.badge         { display: inline-flex; align-items: center; font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 99px; font-weight: 500; }
+.badge         { display: inline-flex; align-items: center; font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.04em; padding: 3px 9px; border-radius: 99px; font-weight: 500; white-space: nowrap; }
 .badge-approve { background: var(--accent-lt); color: var(--accent); }
 .badge-done    { background: #e0f4ed;           color: #1a6640; }
 .badge-cancel  { background: var(--danger-lt);  color: var(--danger); }
@@ -155,11 +160,11 @@ td            { padding: 14px 16px; font-size: 13px; color: var(--ink); vertical
 .badge-notdone { background: var(--warn-lt);    color: var(--warn); }
 .badge-transfer{ background: var(--info-lt);    color: var(--info); }
 
-.msg-cell  { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.time-cell { font-family: var(--ff-mono); font-size: 11px; color: var(--muted); }
+.msg-cell  { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.time-cell { font-family: var(--ff-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
 
 /* ── Acknowledge Button ── */
-.ack-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--ff-body); font-weight: 500; padding: 6px 14px; border-radius: 7px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; transition: all 0.15s; }
+.ack-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--ff-body); font-weight: 500; padding: 6px 14px; border-radius: 7px; border: 1.5px solid var(--accent); background: transparent; color: var(--accent); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
 .ack-btn:hover { background: var(--accent); color: #fff; }
 
 /* ── Modal ── */
@@ -175,7 +180,7 @@ td            { padding: 14px 16px; font-size: 13px; color: var(--ink); vertical
 .modal-body    { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 .modal-footer  { padding: 14px 24px 20px; display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--border); }
 
-/* ── Form fields (shared by modal + reset-password) ── */
+/* ── Form fields ── */
 .field-group { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-family: var(--ff-mono); font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
 textarea, input[type="text"], input[type="password"] { width: 100%; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-family: var(--ff-body); font-size: 13.5px; color: var(--text); background: var(--surface); outline: none; transition: border-color 0.15s; resize: none; }
@@ -223,7 +228,11 @@ textarea { min-height: 80px; }
 .toast.warn      { border-left-color: var(--warn); }
 @keyframes toastIn { from { opacity:0; transform:translateX(20px) } to { opacity:1; transform:translateX(0) } }
 
-/* ── Responsive ── */
+/* ── Responsive ──
+ * FIX: Removed all th/td display:none rules.
+ * Tables scroll horizontally via overflow-x:auto on .table-wrap.
+ * All columns remain visible at every breakpoint.
+ */
 @media (max-width: 768px) {
   .it-sidebar  { transform: translateX(-100%); }
   .it-sidebar.mobile-open { transform: translateX(0); }
@@ -231,11 +240,10 @@ textarea { min-height: 80px; }
   .hamburger   { display: flex; }
   .stats-row   { grid-template-columns: repeat(2, 1fr); }
   .it-content  { padding: 18px 16px; }
-  th:nth-child(3), td:nth-child(3),
-  th:nth-child(4), td:nth-child(4) { display: none; }
+  /* NO column hiding — horizontal scroll handles small screens */
 }
 @media (max-width: 480px) {
   .stats-row  { grid-template-columns: 1fr; }
   .modal      { border-radius: 12px; }
-  th:nth-child(2), td:nth-child(2) { display: none; }
+  /* NO column hiding — horizontal scroll handles small screens */
 }

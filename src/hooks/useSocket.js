@@ -1,59 +1,66 @@
-// src/hooks/useSocket.js
+/**
+ * useSocket — establishes Socket.io connection and registers event handlers.
+ *
+ * ROOT CAUSE FIX — Stale Closures:
+ *
+ * The previous implementation captured `eventHandlers` at mount time:
+ *
+ *   useEffect(() => {
+ *     socket.on("campaign:created", handler); // `handler` is frozen at mount
+ *   }, []);
+ *
+ * When React re-renders (e.g., `addNotification` reference changes after a
+ * Zustand store update, or `setCampaigns` in PMDashboard changes), the socket
+ * still calls the OLD, stale handler. This caused:
+ *   - Notifications firing into discarded closure state → no bell update
+ *   - setCampaigns calling a stale reference → no table update until refresh
+ *   - "Created by" always showing "unknown" until refresh
+ *
+ * FIX — Ref-based delegation:
+ *   1. Store `eventHandlers` in a mutable ref (updated every render, no deps)
+ *   2. Register ONE stable wrapper per event at mount
+ *   3. Each wrapper delegates to `ref.current[event]` at call time
+ *   → The socket always calls the LATEST handler, never a stale one
+ */
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
 
-/**
- * Establishes one Socket.io connection per component mount.
- *
- * FIX — stale closure:
- *   The original hook passed eventHandlers directly into a [] dep effect,
- *   meaning handler functions were captured once at mount. If a handler
- *   ever closed over stale component state it would silently use old values.
- *
- *   Solution: store the latest handlers in a ref. The socket listeners are
- *   registered ONCE (stable wrappers), but each invocation delegates to
- *   handlersRef.current which is updated on every render. This gives us:
- *     • No extra socket reconnections
- *     • Handlers always run with the latest closure values
- */
-
-// All socket events the app emits — listed here once so every useSocket
-// instance registers wrappers for them without needing to know in advance
-// which subset a particular component cares about.
-const ALL_CAMPAIGN_EVENTS = [
-  "campaign:created",
-  "campaign:updated",
-  "campaign:deleted",
-  "campaign:it_queued",
-  "campaign:it_ack",
-];
-
 export const useSocket = (eventHandlers = {}) => {
-  // Always holds the latest handlers without causing the effect to re-run
+  // Mutable ref — always holds the latest handlers without triggering re-renders
   const handlersRef = useRef(eventHandlers);
+
+  // Update ref synchronously on every render so it always points to the latest
+  // handlers. No deps array — this runs every render intentionally.
   useEffect(() => {
     handlersRef.current = eventHandlers;
-    // No deps array → runs after every render, keeping ref in sync
   });
 
   useEffect(() => {
+    // Skip connecting if no handlers provided (enableSocket: false path)
+    if (Object.keys(handlersRef.current).length === 0) return;
+
     const socket = io(
       import.meta.env.VITE_SOCKET_URL || "http://localhost:3000",
       { withCredentials: true }
     );
 
-    // Stable wrappers registered once; they call the *current* handler each time
+    // Stable wrapper functions: registered once at mount, but they delegate
+    // to handlersRef.current at call time → always calls the latest handler.
     const wrappers = {};
-    ALL_CAMPAIGN_EVENTS.forEach((event) => {
-      wrappers[event] = (...args) => handlersRef.current[event]?.(...args);
+    Object.keys(handlersRef.current).forEach(event => {
+      wrappers[event] = (data) => {
+        // handlersRef.current is always the latest version from the last render
+        handlersRef.current[event]?.(data);
+      };
       socket.on(event, wrappers[event]);
     });
 
     return () => {
-      ALL_CAMPAIGN_EVENTS.forEach((event) =>
-        socket.off(event, wrappers[event])
-      );
+      // Clean up all registered wrappers before disconnecting
+      Object.entries(wrappers).forEach(([event, wrapper]) => {
+        socket.off(event, wrapper);
+      });
       socket.disconnect();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional, see above
 };

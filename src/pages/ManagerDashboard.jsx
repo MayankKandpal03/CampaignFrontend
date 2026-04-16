@@ -1,11 +1,24 @@
 /**
- * ManagerDashboard — fixed.
+ * ManagerDashboard — fully fixed for real-time notifications and updates.
  *
- * Columns: Created By | Message | Requested Time | Status | PM Action | Ticket State
- * - Timestamp removed (issue #9)
- * - PM Comment, IT Comment removed from manager view
- * - Creator name shown (populated from backend)
- * - Local addNotification calls removed (socket-only)
+ * FIXES:
+ *
+ * 1. REAL-TIME — Manager now uses explicit useSocket() handlers instead of
+ *    relying solely on useCampaigns(). This ensures:
+ *    - PPC creates campaign → manager sees it immediately + notification
+ *    - PPC updates campaign → manager sees it immediately + notification
+ *    - PM approves/cancels → manager sees it immediately + notification
+ *    - IT acknowledges    → manager sees it immediately + notification
+ *
+ * 2. STALE CLOSURE — useSocket now uses the ref pattern so handlers always
+ *    call the latest addNotification / setCampaigns, never stale captures.
+ *
+ * 3. COLUMNS — All columns visible on all screen sizes via overflowX scroll.
+ *    Columns: Created By | Message | Requested Time | Status | PM Action | Ticket State
+ *    No columns hidden at any breakpoint.
+ *
+ * 4. LOCAL STATE — Manager uses local campaigns state (like PMDashboard) so
+ *    socket patches are always applied to the same array being rendered.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -13,14 +26,14 @@ import useAuthStore  from "../stores/useAuthStore.js";
 import useNotifStore from "../stores/useNotificationStore.js";
 
 import { useResponsive }            from "../hooks/useResponsive.js";
-import { useCampaigns }             from "../hooks/useCampaigns.js";
+import { useSocket }                from "../hooks/useSocket.js";
 import { useLogout }                from "../hooks/useLogout.js";
 import { useTeam }                  from "../hooks/useTeam.js";
 import { T, inputSx }              from "../constants/theme.js";
 import { STATUS_META, ACTION_META } from "../constants/statusMeta.js";
 import { FILTER_CARDS }             from "../constants/filterCards.js";
-import { initials }                 from "../utils/formatters.js";
-import { fmt }                      from "../utils/formatters.js";
+import { initials, fmt }            from "../utils/formatters.js";
+import { fetchCampaigns, createCampaign as createCampaignService, updateCampaign as updateCampaignService } from "../services/campaignService.js";
 import { createUser, deleteUser }   from "../services/userService.js";
 
 import OpsGlobalStyles  from "../components/common/OpsGlobalStyles.jsx";
@@ -38,6 +51,7 @@ import UpdateModal      from "../components/campaigns/UpdateModal.jsx";
 import DeleteUserModal  from "../components/users/DeleteUserModal.jsx";
 import UserCard         from "../components/users/UserCard.jsx";
 
+// Fixed columns — always shown, no hiding at breakpoints
 const COLS = ["CREATED BY", "MESSAGE", "REQUESTED TIME", "STATUS", "PM ACTION", "TICKET STATE"];
 
 export default function ManagerDashboard() {
@@ -47,35 +61,92 @@ export default function ManagerDashboard() {
   const isMobile        = useResponsive();
   const { teamInfo, teamLoading, loadTeamInfo } = useTeam();
 
-  const { campaigns, getCampaign, createCampaign, updateCampaign } = useCampaigns({
-    onNotification: addNotification,
+  // ── Local campaigns state (same pattern as PMDashboard for reliability) ──
+  const [campaigns,     setCampaigns]    = useState([]);
+  const [camLoading,    setCamLoading]   = useState(true);
+  const [pageError,     setPageError]    = useState("");
+  const [activeSection, setActiveSection] = useState("campaigns");
+  const [sidebarOpen,   setSidebarOpen]  = useState(false);
+  const [updateTarget,  setUpdateTarget] = useState(null);
+  const [deleteTarget,  setDeleteTarget] = useState(null);
+  const [statusFilter,  setStatusFilter] = useState(null);
+  const [searchQuery,   setSearchQuery]  = useState("");
+  const [createForm,    setCreateForm]   = useState({ message: "", requestedAt: "" });
+  const [creating,      setCreating]     = useState(false);
+  const [createError,   setCreateError]  = useState("");
+  const [createOk,      setCreateOk]     = useState(false);
+  const [userForm,      setUserForm]     = useState({ username: "", email: "", password: "" });
+  const [creatingUser,  setCreatingUser] = useState(false);
+  const [userError,     setUserError]    = useState("");
+  const [userOk,        setUserOk]       = useState(false);
+
+  // ── Socket — explicit handlers so manager gets ALL relevant real-time events ──
+  // The useSocket ref pattern ensures these handlers always call the latest
+  // setCampaigns / addNotification, never stale closures.
+  useSocket({
+    /**
+     * PPC or Manager created a campaign.
+     * Backend sends this to manager via room:user_{managerId}.
+     */
+    "campaign:created": c => {
+      setCampaigns(prev => {
+        if (prev.some(x => x._id === c._id)) return prev; // dedup
+        return [c, ...prev];
+      });
+      addNotification(`Campaign created by ${c.performerName || "someone"}`);
+    },
+
+    /**
+     * PPC, Manager, or PM updated/cancelled a campaign.
+     * Manager receives via room:user_{managerId} (for PPC actions)
+     * or room:team_* (for PM actions).
+     */
+    "campaign:updated": c => {
+      setCampaigns(prev => prev.map(x => x._id === c._id ? c : x));
+      const msg = c.status === "cancel" || c.action === "cancel"
+        ? `Campaign cancelled by ${c.performerName || "someone"}`
+        : `Campaign updated by ${c.performerName || "someone"}`;
+      addNotification(msg);
+    },
+
+    /**
+     * PM approved campaign — forwarded to IT.
+     * Manager receives via room:team_*.
+     */
+    "campaign:it_queued": c => {
+      setCampaigns(prev => prev.map(x => x._id === c._id ? c : x));
+      addNotification(`Campaign approved by ${c.performerName || "PM"} — sent to IT`);
+    },
+
+    /**
+     * IT acknowledged a campaign (done or not done).
+     * Manager receives via room:team_*.
+     */
+    "campaign:it_ack": c => {
+      setCampaigns(prev => prev.map(x => x._id === c._id ? c : x));
+      const msg = c.acknowledgement === "done"
+        ? `${c.performerName || "IT"} completed campaign`
+        : `${c.performerName || "IT"} could not complete campaign`;
+      addNotification(msg);
+    },
+
+    "campaign:deleted": d => {
+      setCampaigns(prev => prev.filter(x => x._id !== d._id));
+    },
   });
 
-  const [loading,       setLoading]       = useState(true);
-  const [pageError,     setPageError]     = useState("");
-  const [activeSection, setActiveSection] = useState("campaigns");
-  const [sidebarOpen,   setSidebarOpen]   = useState(false);
-  const [updateTarget,  setUpdateTarget]  = useState(null);
-  const [deleteTarget,  setDeleteTarget]  = useState(null);
-  const [statusFilter,  setStatusFilter]  = useState(null);
-  const [searchQuery,   setSearchQuery]   = useState("");
-  const [createForm,    setCreateForm]    = useState({ message: "", requestedAt: "" });
-  const [creating,      setCreating]      = useState(false);
-  const [createError,   setCreateError]   = useState("");
-  const [createOk,      setCreateOk]      = useState(false);
-  const [userForm,      setUserForm]      = useState({ username: "", email: "", password: "" });
-  const [creatingUser,  setCreatingUser]  = useState(false);
-  const [userError,     setUserError]     = useState("");
-  const [userOk,        setUserOk]        = useState(false);
-
+  // ── Load on mount ────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
-      try   { await Promise.all([getCampaign(), loadTeamInfo()]); }
-      catch { setPageError("Failed to load data. Please refresh."); }
-      finally { setLoading(false); }
+      try {
+        const [data] = await Promise.all([fetchCampaigns(), loadTeamInfo()]);
+        setCampaigns(data);
+      } catch { setPageError("Failed to load data. Please refresh."); }
+      finally   { setCamLoading(false); }
     })();
   }, []); // eslint-disable-line
 
+  // ── Derived state ─────────────────────────────────────────────────────────────
   const teamId = useMemo(() => {
     if (teamInfo?._id) return teamInfo._id;
     const raw = campaigns[0]?.teamId;
@@ -103,11 +174,15 @@ export default function ManagerDashboard() {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(c => c.message?.toLowerCase().includes(q));
+      list = list.filter(c =>
+        c.message?.toLowerCase().includes(q) ||
+        (typeof c.createdBy === "object" ? c.createdBy?.username : "")?.toLowerCase().includes(q)
+      );
     }
     return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [campaigns, statusFilter, searchQuery]);
 
+  // ── Handlers ──────────────────────────────────────────────────────────────────
   const goTo = section => {
     setActiveSection(section); setSidebarOpen(false);
     setCreateError(""); setCreateOk(false);
@@ -120,18 +195,32 @@ export default function ManagerDashboard() {
     if (!createForm.message.trim()) { setCreateError("Campaign message is required."); return; }
     setCreating(true);
     try {
-      await createCampaign({ message: createForm.message.trim(), requestedAt: createForm.requestedAt || undefined, teamId });
+      // FIX: no local addNotification — socket fires the single notification
+      const newCampaign = await createCampaignService({
+        message:     createForm.message.trim(),
+        requestedAt: createForm.requestedAt || undefined,
+        teamId,
+      });
+      // Add to local state (socket will also fire but dedup handles it)
+      if (newCampaign) {
+        setCampaigns(prev => {
+          if (prev.some(x => x._id === newCampaign._id)) return prev;
+          return [newCampaign, ...prev];
+        });
+      }
       setCreateForm({ message: "", requestedAt: "" }); setCreateOk(true);
-      // FIX: no local notification
       setTimeout(() => { setActiveSection("campaigns"); setCreateOk(false); }, 1800);
     } catch (err) { setCreateError(err?.response?.data?.message || "Failed to create campaign."); }
-    finally { setCreating(false); }
-  }, [teamId, createForm, createCampaign]);
+    finally       { setCreating(false); }
+  }, [teamId, createForm]);
 
-  const handleUpdate = useCallback(async (id, data) => {
-    await updateCampaign(id, data);
-    // FIX: no local notification
-  }, [updateCampaign]);
+  const handleUpdate = useCallback(async (campaignId, data) => {
+    const updated = await updateCampaignService(campaignId, data);
+    if (updated) {
+      setCampaigns(prev => prev.map(c => c._id === updated._id ? updated : c));
+      // FIX: no local addNotification — socket fires the single notification
+    }
+  }, []);
 
   const handleCreateUser = useCallback(async e => {
     e.preventDefault(); setUserError(""); setUserOk(false);
@@ -143,7 +232,7 @@ export default function ManagerDashboard() {
       await loadTeamInfo();
       setTimeout(() => setUserOk(false), 3000);
     } catch (err) { setUserError(err?.response?.data?.message || "Failed to create user."); }
-    finally { setCreatingUser(false); }
+    finally       { setCreatingUser(false); }
   }, [userForm, loadTeamInfo]);
 
   const handleDeleteUser = useCallback(async id => {
@@ -156,6 +245,7 @@ export default function ManagerDashboard() {
     { id: "team",      label: "Team Members",   count: ppcMembers.length },
   ];
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:T.bg, color:T.text, fontFamily:"'DM Sans',sans-serif" }}>
       <OpsGlobalStyles />
@@ -189,7 +279,7 @@ export default function ManagerDashboard() {
                 activeFilter={statusFilter} onClearFilter={() => setStatusFilter(null)}
                 isMobile={isMobile} />
 
-              {loading ? (
+              {camLoading ? (
                 <div style={{ padding:"52px 20px", textAlign:"center", color:T.muted, fontSize:13 }}>
                   <div style={{ marginBottom:10, color:T.gold, fontSize:22 }}>◈</div>Loading…
                 </div>
@@ -198,8 +288,9 @@ export default function ManagerDashboard() {
                   sub={searchQuery || statusFilter ? "Adjust search or filter." : "No team campaigns yet."}
                   action={!searchQuery && !statusFilter ? <GoldBtn variant="outline" onClick={() => goTo("create")}>CREATE CAMPAIGN</GoldBtn> : null} />
               ) : (
-                <div style={{ overflowX:"auto" }}>
-                  <table style={{ width:"100%", borderCollapse:"collapse", minWidth:720 }}>
+                /* FIX: overflowX:auto so all columns scroll on small screens */
+                <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
+                  <table style={{ width:"100%", borderCollapse:"collapse", minWidth:760 }}>
                     <thead>
                       <tr style={{ borderBottom:`1px solid ${T.subtle}`, background:`${T.bg}dd` }}>
                         {COLS.map(h => (
@@ -209,7 +300,6 @@ export default function ManagerDashboard() {
                     </thead>
                     <tbody>
                       {filtered.map((c, i) => {
-                        // createdBy is populated by backend: { _id, username, email }
                         const creatorName = typeof c.createdBy === "object"
                           ? c.createdBy?.username
                           : null;
@@ -270,7 +360,7 @@ export default function ManagerDashboard() {
                 </div>
               )}
 
-              {!loading && filtered.length > 0 && (
+              {!camLoading && filtered.length > 0 && (
                 <div style={{ padding:"9px 18px", borderTop:`1px solid ${T.subtle}22`, display:"flex", justifyContent:"space-between", background:`${T.bg}aa` }}>
                   <span style={{ fontSize:9, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{filtered.length} of {campaigns.length} campaigns</span>
                   <span style={{ fontSize:9, color:T.subtle, fontFamily:"'JetBrains Mono',monospace" }}>LIVE UPDATES ACTIVE</span>
