@@ -1,9 +1,15 @@
+// src/constants/filterCards.js
+
 /**
- * Filter card configurations.
+ * FIX: Added OPEN_REQUEST_FILTER_CARDS and CLOSED_REQUEST_FILTER_CARDS.
  *
- * FILTER_CARDS           — 5-item set for PPC and Manager dashboards.
- * PM_FILTER_CARDS        — 5-item set for PM campaigns (adds Pending).
- * OPEN_REQUEST_CARDS     — 3-item stat cards for PM open-requests section.
+ * Open Requests  → campaigns the PM hasn't acted on yet (pending) OR has
+ *                  approved and forwarded to IT (approve). Two cards only.
+ *
+ * Closed Requests → campaigns that are fully done OR cancelled. Two cards only.
+ *
+ * These are passed as the `filterCards` prop to CampaignsTable so each PM
+ * section shows only the relevant status cards.
  */
 import { T } from "./theme.js";
 
@@ -17,8 +23,7 @@ export const FILTER_CARDS = [
 ];
 
 /**
- * PM all-campaigns section — 5 cards including Pending (no PM action yet).
- * FIX: "Pending" was missing so PM had no way to filter campaigns awaiting action.
+ * PM all-campaigns section — 4 cards.
  */
 export const PM_FILTER_CARDS = [
   { id: "pending",   label: "Pending",    color: T.amber,  bg: T.amberBg },
@@ -28,8 +33,25 @@ export const PM_FILTER_CARDS = [
 ];
 
 /**
- * PM open-requests section stat cards.
- * Shows summary counts for campaigns awaiting IT, IT-completed, and fully done.
+ * PM → Open Requests section.
+ * Only: Pending (no PM action yet) + Approved (forwarded to IT).
+ */
+export const OPEN_REQUEST_FILTER_CARDS = [
+  { id: "pending",  label: "Pending",   color: T.amber, bg: T.amberBg },
+  { id: "approve",  label: "Approved",  color: T.teal,  bg: T.tealBg  },
+];
+
+/**
+ * PM → Closed Requests section.
+ * Only: Done + Cancelled.
+ */
+export const CLOSED_REQUEST_FILTER_CARDS = [
+  { id: "done",   label: "Done",      color: T.green, bg: T.greenBg },
+  { id: "cancel", label: "Cancelled", color: T.red,   bg: T.redBg   },
+];
+
+/**
+ * PM open-requests section stat cards (the summary row above the table).
  */
 export const OPEN_REQUEST_CARDS = [
   { id: "waiting",   label: "Waiting IT", color: T.amber,  bg: T.amberBg },

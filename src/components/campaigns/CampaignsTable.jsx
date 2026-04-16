@@ -1,12 +1,13 @@
+// src/components/campaigns/CampaignsTable.jsx
 /**
  * CampaignsTable — PM's filterable, searchable campaign table.
  *
- * FIXES:
- * - Timestamp removed (issue #9)
- * - Columns: Created By | PPC Message | PM Comment | Requested Time | Schedule At | IT Comment | Ticket State
- * - Pending filter card added (issue #7) — shows campaigns with no PM action
- * - Creator username displayed from populated `createdBy` field (issue #8)
- * - PM_FILTER_CARDS used (4 cards: Pending, Approved, Done, Cancelled)
+ * FIX: Added `filterCards` prop (default PM_FILTER_CARDS).
+ *   PMDashboard now passes OPEN_REQUEST_FILTER_CARDS or
+ *   CLOSED_REQUEST_FILTER_CARDS so each section shows only the
+ *   relevant status cards instead of all four every time.
+ *
+ * All other columns and logic unchanged.
  */
 import { useState, useMemo } from "react";
 import { T, inputSx }        from "../../constants/theme.js";
@@ -26,12 +27,15 @@ export default function CampaignsTable({
   loading,
   onAction,
   isMobile,
-  title       = "ALL CAMPAIGNS",
+  title         = "ALL CAMPAIGNS",
   showActionBtn = true,
+  // FIX: callers can now pass their own card set; default keeps existing behaviour
+  filterCards   = PM_FILTER_CARDS,
 }) {
   const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
 
+  // Stats cover every possible card id so any card set works without extra code
   const stats = useMemo(() => ({
     pending:  campaigns.filter(c => !c.action).length,
     approve:  campaigns.filter(c => c.action === "approve").length,
@@ -65,9 +69,9 @@ export default function CampaignsTable({
 
   return (
     <div>
-      {/* Filter cards */}
+      {/* Filter cards — uses whatever set the parent passed in */}
       <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
-        {PM_FILTER_CARDS.map(card => {
+        {filterCards.map(card => {
           const active = statusFilter === card.id;
           return (
             <div key={card.id} className="ops-fcard"
@@ -142,7 +146,7 @@ export default function CampaignsTable({
               </thead>
               <tbody>
                 {filtered.map((c, i) => {
-                  // createdBy is populated by backend: { _id, username }
+                  // createdBy is now always populated from backend
                   const creatorName = typeof c.createdBy === "object"
                     ? c.createdBy?.username
                     : null;

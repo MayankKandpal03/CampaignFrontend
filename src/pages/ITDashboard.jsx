@@ -1,23 +1,23 @@
+// src/pages/ITDashboard.jsx
 /**
- * ITDashboard — refactored.
+ * ITDashboard — fixed.
  *
- * WHAT CHANGED vs original:
- *  - AckModal         → components/campaigns/AckModal.jsx
- *  - ResetPassword    → components/auth/ResetPassword.jsx
- *                       (also uses authService.changePassword instead of api.post directly)
- *  - IT-specific STYLES string → src/styles/it.css (imported below)
- *  - fmt helper       → utils/formatters.js
- *  - initials helper  → utils/formatters.js
- *  - StatusBadge      → shared (keeps IT's own CSS class variant via `meta` prop override)
- *  - injectItFonts()  → utils/fontLoader.js (called once in main.jsx)
+ * FIXES vs previous version:
  *
- * What stays here: IT-specific tab state, campaign filtering
- * (action==="approve" && acknowledgement!=="done"), stat derivations,
- * toast notification logic, and the table layout.
+ * 1. Campaign receipt timing:
+ *    itCampaigns now filters by scheduleAt <= now in addition to
+ *    action==="approve". Campaigns whose scheduled time has not arrived
+ *    yet are invisible to IT even if PM approved them.
+ *    Also, campaigns cancelled by PPC/Manager (status==="cancel") are
+ *    excluded so they never appear in the IT queue.
  *
- * NOTE: The IT Dashboard uses a different CSS-class-based styling system
- * (light warm theme) vs the inline-style dark OPS SUITE system.
- * The STYLES string has been moved to src/styles/it.css.
+ * 2. Auto-refresh every 60 seconds so newly-scheduled campaigns
+ *    appear without a manual page refresh once their time arrives.
+ *    (The backend also enforces this filter, so a forced GET is the
+ *    simplest way to "deliver" a scheduled campaign in real-time without
+ *    a server-side cron job.)
+ *
+ * All other logic (AckModal, ResetPassword tab, toast system) unchanged.
  */
 import { useEffect, useState, useCallback, useRef } from "react";
 
@@ -29,10 +29,9 @@ import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
 import ResetPassword     from "../components/auth/ResetPassword.jsx";
 
-/* IT Dashboard imports its own CSS rather than using inline styles */
 import "../styles/it.css";
 
-/* ─── Local StatusBadge (IT uses CSS classes, not inline styles) ─────────── */
+/* ─── Local StatusBadge (IT uses CSS classes) ────────────────────────────── */
 function StatusBadge({ value }) {
   const map = {
     approve:    ["badge-approve",  "Approved"],
@@ -61,11 +60,42 @@ export default function ITDashboard() {
   const [toasts,      setToasts]      = useState([]);
   const [refreshing,  setRefreshing]  = useState(false);
 
+  // Initial fetch
   useEffect(() => { getCampaign().catch(console.error); }, [getCampaign]);
 
-  // IT sees only approved, not-yet-done campaigns
-  const itCampaigns = campaigns.filter(c => c.action === "approve" && c.acknowledgement !== "done");
-  const doneCount   = campaigns.filter(c => c.acknowledgement === "done").length;
+  /**
+   * FIX: Auto-refresh every 60 s so campaigns whose scheduleAt arrives
+   * between manual refreshes appear automatically.
+   * The backend enforces the time filter; we just re-fetch to pick up
+   * newly eligible campaigns.
+   */
+  useEffect(() => {
+    const id = setInterval(() => getCampaign().catch(console.error), 60_000);
+    return () => clearInterval(id);
+  }, [getCampaign]);
+
+  /**
+   * FIX: Campaign receipt timing.
+   *   • action must be "approve"
+   *   • status must NOT be "cancel" (PPC/Manager cancelled after PM approved)
+   *   • acknowledgement must not already be "done"
+   *   • scheduleAt (if set) must be <= now
+   *
+   * Without this filter IT was seeing campaigns the moment PM approved,
+   * regardless of when they were scheduled to run.
+   */
+  const now = Date.now();
+  const itCampaigns = campaigns.filter(c => {
+    if (c.action !== "approve")          return false;
+    if (c.status  === "cancel")          return false; // cancelled before schedule
+    if (c.acknowledgement === "done")    return false; // already handled
+    if (c.scheduleAt) {
+      return new Date(c.scheduleAt).getTime() <= now;  // not yet due
+    }
+    return true; // no schedule → show immediately
+  });
+
+  const doneCount    = campaigns.filter(c => c.acknowledgement === "done").length;
   const pendingCount = itCampaigns.length;
 
   const pushToast = useCallback((msg, type = "success") => {
@@ -106,13 +136,12 @@ export default function ITDashboard() {
   return (
     <div className="it-root">
 
-      {/* Sidebar overlay */}
       <div className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* ── Sidebar ── */}
       <aside className={`it-sidebar ${sidebarOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-name">Campaign<i style={{ fontStyle: "normal", opacity: 0.4 }}>.</i></div>
+          <div className="sidebar-brand-name">Campaign<i style={{ fontStyle:"normal", opacity:0.4 }}>.</i></div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
 
@@ -175,7 +204,7 @@ export default function ITDashboard() {
                 <div className="stat-card">
                   <div className="stat-label">Pending Action</div>
                   <div className="stat-value">{pendingCount}</div>
-                  <div className="stat-sub">Awaiting acknowledgement</div>
+                  <div className="stat-sub">Scheduled &amp; awaiting acknowledgement</div>
                 </div>
                 <div className="stat-card">
                   <div className="stat-label">Completed</div>
@@ -183,9 +212,9 @@ export default function ITDashboard() {
                   <div className="stat-sub">Acknowledged as done</div>
                 </div>
                 <div className="stat-card">
-                  <div className="stat-label">Total Received</div>
+                  <div className="stat-label">Total Approved</div>
                   <div className="stat-value">{campaigns.filter(c => c.action === "approve").length}</div>
-                  <div className="stat-sub">Approved by PM</div>
+                  <div className="stat-sub">Approved by PM (all time)</div>
                 </div>
               </div>
 
@@ -200,7 +229,9 @@ export default function ITDashboard() {
                 {itCampaigns.length === 0 ? (
                   <div className="table-empty">
                     <div className="table-empty-icon">✅</div>
-                    <div className="table-empty-text">No pending campaigns. Queue is clear.</div>
+                    <div className="table-empty-text">
+                      No campaigns due yet. Queue is clear.
+                    </div>
                   </div>
                 ) : (
                   <table>

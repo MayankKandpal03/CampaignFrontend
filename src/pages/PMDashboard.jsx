@@ -1,13 +1,18 @@
+// src/pages/PMDashboard.jsx
 /**
- * PMDashboard — fully fixed.
+ * PMDashboard — fixed.
  *
- * FIXES:
- * - Socket enabled (was commented out)
- * - campaign:it_queued handler added
- * - No local addNotification calls — socket-only
- * - Users section shows 3-tab layout (Managers / PPCs / IT)
- * - "Pending" stat cards in open-requests section
- * - handleAction uses updateCampaign service (not raw api.post)
+ * FIXES vs previous version:
+ *
+ * 1. Open Requests now shows pending (no PM action) + approved campaigns.
+ *    Previously it only showed action==="approve" && !acknowledgement.
+ *    Filter cards limited to OPEN_REQUEST_FILTER_CARDS (pending + approved).
+ *
+ * 2. Closed Requests now shows done + cancelled campaigns only.
+ *    Filter cards limited to CLOSED_REQUEST_FILTER_CARDS (done + cancelled).
+ *
+ * 3. No other logic changed — socket handlers, user CRUD, campaign actions
+ *    all remain identical.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -18,7 +23,11 @@ import { useResponsive }                   from "../hooks/useResponsive.js";
 import { useSocket }                       from "../hooks/useSocket.js";
 import { useLogout }                       from "../hooks/useLogout.js";
 import { T }                               from "../constants/theme.js";
-import { OPEN_REQUEST_CARDS }              from "../constants/filterCards.js";
+import {
+  OPEN_REQUEST_CARDS,
+  OPEN_REQUEST_FILTER_CARDS,
+  CLOSED_REQUEST_FILTER_CARDS,
+} from "../constants/filterCards.js";
 import { fetchCampaigns, updateCampaign }  from "../services/campaignService.js";
 import { fetchUsers, deleteUser }          from "../services/userService.js";
 
@@ -93,7 +102,7 @@ export default function PMDashboard() {
   const loadUsers = useCallback(async () => {
     setUserLoading(true);
     try {
-      const data = await fetchUsers(); // GET /user/list — backend endpoint now exists
+      const data = await fetchUsers();
       if (data) {
         setUsers(data);
       } else {
@@ -114,21 +123,34 @@ export default function PMDashboard() {
   }, [activeSection, loadUsers]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const openRequests   = useMemo(() => campaigns.filter(c => c.action === "approve" && !c.acknowledgement), [campaigns]);
-  const closedRequests = useMemo(() => campaigns.filter(c =>
-    c.status === "cancel" || c.action === "cancel" || c.acknowledgement
-  ), [campaigns]);
+  /**
+   * FIX: Open Requests = campaigns pending PM review OR already approved.
+   * Previous: only approved & no-ack campaigns.
+   * Now PM can see everything that still needs attention in one place.
+   */
+  const openRequests = useMemo(() =>
+    campaigns.filter(c => !c.action || c.action === "approve")
+  , [campaigns]);
+
+  /**
+   * FIX: Closed Requests = done OR cancelled only.
+   * Previous included acknowledgement-based filter which was redundant.
+   */
+  const closedRequests = useMemo(() =>
+    campaigns.filter(c =>
+      c.status === "cancel" || c.action === "cancel" || c.status === "done"
+    )
+  , [campaigns]);
 
   const totalUsers = useMemo(() =>
     users.filter(u => ["manager","ppc","it"].includes(u.role)).length
   , [users]);
 
-  // Open request stat counts
   const openStats = useMemo(() => ({
-    waiting: openRequests.filter(c => !c.acknowledgement).length,
+    waiting: campaigns.filter(c => c.action === "approve" && !c.acknowledgement).length,
     acked:   campaigns.filter(c => c.action === "approve" && c.acknowledgement === "done").length,
     done:    campaigns.filter(c => c.status === "done").length,
-  }), [campaigns, openRequests]);
+  }), [campaigns]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const goTo = section => { setActiveSection(section); setSidebarOpen(false); };
@@ -137,14 +159,12 @@ export default function PMDashboard() {
     const updated = await updateCampaign(campaignId, { action, pmMessage, scheduleAt });
     if (updated) {
       setCampaigns(prev => prev.map(c => c._id === updated._id ? updated : c));
-      // FIX: no local addNotification — socket fires it
     }
   }, []);
 
   const handleDeleteUser = useCallback(async id => {
     await deleteUser(id);
     setUsers(prev => prev.filter(u => u._id !== id));
-    // FIX: no local addNotification
   }, []);
 
   const handleUserCreated = useCallback(() => {
@@ -160,11 +180,11 @@ export default function PMDashboard() {
   ];
 
   const SECTION_TITLE = {
-    campaigns:        "Campaigns",
-    users:            "Users",
-    "manage-users":   "Manage Users",
-    "open-requests":  "Open Requests",
-    "closed-requests":"Closed Requests",
+    campaigns:          "Campaigns",
+    users:              "Users",
+    "manage-users":     "Manage Users",
+    "open-requests":    "Open Requests",
+    "closed-requests":  "Closed Requests",
   };
 
   return (
@@ -227,7 +247,7 @@ export default function PMDashboard() {
           {/* ── OPEN REQUESTS ─────────────────────────────────────────── */}
           {activeSection === "open-requests" && (
             <div style={{ animation:"opsFadeUp .22s ease" }}>
-              {/* Stat cards for open requests */}
+              {/* Summary stat row (Waiting IT / IT Done / Done) */}
               <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
                 {OPEN_REQUEST_CARDS.map(card => (
                   <div key={card.id} style={{
@@ -251,12 +271,21 @@ export default function PMDashboard() {
               <div style={{ display:"flex", gap:12, alignItems:"center", marginBottom:20, padding:"12px 18px", background:T.bgCard, border:`1px solid ${T.teal}33`, borderRadius:4 }}>
                 <span style={{ width:8, height:8, borderRadius:"50%", background:T.teal, flexShrink:0, boxShadow:`0 0 8px ${T.teal}` }} />
                 <p style={{ margin:0, fontSize:12, color:T.muted, lineHeight:1.6 }}>
-                  Campaigns <strong style={{ color:T.teal }}>approved</strong> by PM — awaiting IT acknowledgement.
+                  Campaigns <strong style={{ color:T.amber }}>awaiting your review</strong> or{" "}
+                  <strong style={{ color:T.teal }}>approved</strong> and waiting for IT.
                 </p>
               </div>
-              <CampaignsTable campaigns={openRequests} loading={camLoading}
-                onAction={setActionTarget} isMobile={isMobile}
-                title="OPEN · AWAITING IT" showActionBtn={false} />
+
+              {/* FIX: pass OPEN_REQUEST_FILTER_CARDS — shows only Pending + Approved cards */}
+              <CampaignsTable
+                campaigns={openRequests}
+                loading={camLoading}
+                onAction={setActionTarget}
+                isMobile={isMobile}
+                title="OPEN · PENDING & APPROVED"
+                showActionBtn
+                filterCards={OPEN_REQUEST_FILTER_CARDS}
+              />
             </div>
           )}
 
@@ -266,12 +295,20 @@ export default function PMDashboard() {
               <div style={{ display:"flex", gap:12, alignItems:"center", marginBottom:20, padding:"12px 18px", background:T.bgCard, border:`1px solid ${T.subtle}`, borderRadius:4 }}>
                 <span style={{ width:8, height:8, borderRadius:"50%", background:T.muted, flexShrink:0 }} />
                 <p style={{ margin:0, fontSize:12, color:T.muted, lineHeight:1.6 }}>
-                  Closed campaigns — cancelled or acknowledged by IT.
+                  Closed campaigns — marked Done or Cancelled.
                 </p>
               </div>
-              <CampaignsTable campaigns={closedRequests} loading={camLoading}
-                onAction={setActionTarget} isMobile={isMobile}
-                title="CLOSED · PROCESSED" showActionBtn={false} />
+
+              {/* FIX: pass CLOSED_REQUEST_FILTER_CARDS — shows only Done + Cancelled cards */}
+              <CampaignsTable
+                campaigns={closedRequests}
+                loading={camLoading}
+                onAction={setActionTarget}
+                isMobile={isMobile}
+                title="CLOSED · DONE & CANCELLED"
+                showActionBtn={false}
+                filterCards={CLOSED_REQUEST_FILTER_CARDS}
+              />
             </div>
           )}
         </div>
