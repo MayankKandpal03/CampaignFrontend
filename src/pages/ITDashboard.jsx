@@ -1,29 +1,30 @@
 // src/pages/ITDashboard.jsx
 /**
- * ITDashboard — fixed.
+ * ITDashboard — updated.
  *
- * FIXES vs previous version:
+ * Changes vs previous version:
  *
- * 1. Campaign receipt timing:
- *    itCampaigns now filters by scheduleAt <= now in addition to
- *    action==="approve". Campaigns whose scheduled time has not arrived
- *    yet are invisible to IT even if PM approved them.
- *    Also, campaigns cancelled by PPC/Manager (status==="cancel") are
- *    excluded so they never appear in the IT queue.
+ * 1. useSocket added with handlers for all relevant campaign events.
+ *    The backend now pushes campaign:it_queued to room:it at the exact
+ *    scheduled moment. Without these handlers the IT dashboard had no
+ *    socket listener and would never receive the real-time push.
  *
- * 2. Auto-refresh every 60 seconds so newly-scheduled campaigns
- *    appear without a manual page refresh once their time arrives.
- *    (The backend also enforces this filter, so a forced GET is the
- *    simplest way to "deliver" a scheduled campaign in real-time without
- *    a server-side cron job.)
+ * 2. "Not done" acknowledgement now results in status === "cancel" /
+ *    action === "cancel" from the backend, so the itCampaigns filter
+ *    (action !== "approve") naturally removes it from the queue without
+ *    any frontend logic change.
  *
- * All other logic (AckModal, ResetPassword tab, toast system) unchanged.
+ * 3. 60-second auto-refresh is kept as a safety net for the edge case
+ *    where the server was restarted and restoreScheduledDeliveries has
+ *    not yet fired (e.g. a deployment race). The socket push is the
+ *    primary mechanism.
  */
 import { useEffect, useState, useCallback, useRef } from "react";
 
 import useCampaignStore from "../stores/useCampaignStore.js";
 import useAuthStore     from "../stores/useAuthStore.js";
 import useNotifStore    from "../stores/useNotificationStore.js";
+import { useSocket }    from "../hooks/useSocket.js";
 
 import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
@@ -60,48 +61,91 @@ export default function ITDashboard() {
   const [toasts,      setToasts]      = useState([]);
   const [refreshing,  setRefreshing]  = useState(false);
 
-  // Initial fetch
+  // ── Initial fetch ──────────────────────────────────────────────────────────
   useEffect(() => { getCampaign().catch(console.error); }, [getCampaign]);
 
-  /**
-   * FIX: Auto-refresh every 60 s so campaigns whose scheduleAt arrives
-   * between manual refreshes appear automatically.
-   * The backend enforces the time filter; we just re-fetch to pick up
-   * newly eligible campaigns.
-   */
+  // ── Real-time socket handlers ──────────────────────────────────────────────
+  // These are the primary delivery mechanism for Issue 3. The backend pushes
+  // campaign:it_queued to room:it at the exact scheduled time via setTimeout.
+  // Without this hook the IT dashboard would never receive those pushes.
+  useSocket({
+    /**
+     * A campaign just became due (either immediately on PM approve, or at
+     * the scheduled time for future campaigns). Add it to the store if it
+     * isn't there yet; patch it if it is (handles re-approvals).
+     */
+    "campaign:it_queued": (c) => {
+      useCampaignStore.setState((s) => {
+        const exists = s.campaigns.some((x) => x._id === c._id);
+        return {
+          campaigns: exists
+            ? s.campaigns.map((x) => (x._id === c._id ? c : x))
+            : [c, ...s.campaigns],
+        };
+      });
+      addNotification(
+        `📋 New campaign in queue: "${c.message?.slice(0, 40)}${c.message?.length > 40 ? "…" : ""}"`
+      );
+    },
+
+    /**
+     * PM cancelled or updated a campaign that is currently in the IT list.
+     * Patch it so the UI reflects the latest state without a reload.
+     */
+    "campaign:updated": (c) => {
+      useCampaignStore.setState((s) => ({
+        campaigns: s.campaigns.map((x) => (x._id === c._id ? c : x)),
+      }));
+    },
+
+    /**
+     * Another IT user acknowledged a campaign — keep the shared queue
+     * consistent across all logged-in IT agents.
+     */
+    "campaign:it_ack": (c) => {
+      useCampaignStore.setState((s) => ({
+        campaigns: s.campaigns.map((x) => (x._id === c._id ? c : x)),
+      }));
+    },
+
+    "campaign:deleted": (d) => {
+      useCampaignStore.setState((s) => ({
+        campaigns: s.campaigns.filter((x) => x._id !== d._id),
+      }));
+    },
+  });
+
+  // ── 60-second auto-refresh (safety net for server restarts) ───────────────
   useEffect(() => {
     const id = setInterval(() => getCampaign().catch(console.error), 60_000);
     return () => clearInterval(id);
   }, [getCampaign]);
 
-  /**
-   * FIX: Campaign receipt timing.
-   *   • action must be "approve"
-   *   • status must NOT be "cancel" (PPC/Manager cancelled after PM approved)
-   *   • acknowledgement must not already be "done"
-   *   • scheduleAt (if set) must be <= now
-   *
-   * Without this filter IT was seeing campaigns the moment PM approved,
-   * regardless of when they were scheduled to run.
-   */
+  // ── Derived campaign list ──────────────────────────────────────────────────
+  // Filters applied here mirror the backend getCampaignService IT branch:
+  //   • action must be "approve"  (not done → action becomes "cancel" → excluded)
+  //   • status must not be "cancel"
+  //   • not already acknowledged as "done"
+  //   • scheduleAt (if set) must be ≤ now  (future-scheduled not shown yet)
   const now = Date.now();
-  const itCampaigns = campaigns.filter(c => {
-    if (c.action !== "approve")          return false;
-    if (c.status  === "cancel")          return false; // cancelled before schedule
-    if (c.acknowledgement === "done")    return false; // already handled
+  const itCampaigns = campaigns.filter((c) => {
+    if (c.action !== "approve")       return false;
+    if (c.status  === "cancel")       return false;
+    if (c.acknowledgement === "done") return false;
     if (c.scheduleAt) {
-      return new Date(c.scheduleAt).getTime() <= now;  // not yet due
+      return new Date(c.scheduleAt).getTime() <= now;
     }
-    return true; // no schedule → show immediately
+    return true;
   });
 
-  const doneCount    = campaigns.filter(c => c.acknowledgement === "done").length;
+  const doneCount    = campaigns.filter((c) => c.acknowledgement === "done").length;
   const pendingCount = itCampaigns.length;
 
+  // ── Toast helpers ──────────────────────────────────────────────────────────
   const pushToast = useCallback((msg, type = "success") => {
     const id = Date.now();
-    setToasts(p => [...p, { id, msg, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
+    setToasts((p) => [...p, { id, msg, type }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), 3500);
   }, []);
 
   const handleRefresh = async () => {
@@ -111,21 +155,29 @@ export default function ITDashboard() {
     pushToast("Campaigns refreshed");
   };
 
+  // ── Acknowledge handler ────────────────────────────────────────────────────
   const handleAck = async ({ acknowledgement, itMessage }) => {
     if (!ackTarget) return;
     setAckLoading(true);
     try {
       await updateCampaign(ackTarget._id, { acknowledgement, itMessage });
       if (acknowledgement === "done") {
-        addNotification(`✅ IT: Campaign "${ackTarget.message?.slice(0, 30)}…" marked as Done by ${user}`);
+        addNotification(
+          `✅ IT: Campaign "${ackTarget.message?.slice(0, 30)}…" marked Done by ${user}`
+        );
         pushToast("Campaign acknowledged as Done. PMs & owner notified.");
       } else {
-        addNotification(`⚠ IT: "${ackTarget.message?.slice(0, 30)}…" marked Not Done — Reason: ${itMessage}`);
-        pushToast("Reason sent to Process Manager.", "warn");
+        addNotification(
+          `⚠ IT: "${ackTarget.message?.slice(0, 30)}…" marked Not Done — Reason: ${itMessage}`
+        );
+        pushToast("Campaign marked Not Done. Status set to Cancelled.", "warn");
       }
       setAckTarget(null);
-    } catch { pushToast("Failed to update. Please retry.", "warn"); }
-    finally   { setAckLoading(false); }
+    } catch {
+      pushToast("Failed to update. Please retry.", "warn");
+    } finally {
+      setAckLoading(false);
+    }
   };
 
   const NAV = [
@@ -135,13 +187,17 @@ export default function ITDashboard() {
 
   return (
     <div className="it-root">
-
-      <div className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`} onClick={() => setSidebarOpen(false)} />
+      <div
+        className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
       {/* ── Sidebar ── */}
       <aside className={`it-sidebar ${sidebarOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-name">Campaign<i style={{ fontStyle:"normal", opacity:0.4 }}>.</i></div>
+          <div className="sidebar-brand-name">
+            Campaign<i style={{ fontStyle: "normal", opacity: 0.4 }}>.</i>
+          </div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
 
@@ -154,7 +210,7 @@ export default function ITDashboard() {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV.map(n => (
+          {NAV.map((n) => (
             <button
               key={n.id}
               className={`nav-item ${tab === n.id ? "active" : ""}`}
@@ -176,7 +232,10 @@ export default function ITDashboard() {
       {/* ── Main ── */}
       <div className="it-main">
         <header className="it-header">
-          <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <button
+            className="hamburger"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
             <span /><span /><span />
           </button>
           <h1 className="header-title">
@@ -197,7 +256,7 @@ export default function ITDashboard() {
 
         <div className="it-content">
 
-          {/* ── CAMPAIGNS TAB ─────────────────────────────────────────── */}
+          {/* ── CAMPAIGNS TAB ──────────────────────────────────────────── */}
           {tab === "campaigns" && (
             <>
               <div className="stats-row">
@@ -213,14 +272,20 @@ export default function ITDashboard() {
                 </div>
                 <div className="stat-card">
                   <div className="stat-label">Total Approved</div>
-                  <div className="stat-value">{campaigns.filter(c => c.action === "approve").length}</div>
+                  <div className="stat-value">
+                    {campaigns.filter((c) => c.action === "approve").length}
+                  </div>
                   <div className="stat-sub">Approved by PM (all time)</div>
                 </div>
               </div>
 
               <div className="section-head">
                 <span className="section-title">Request Queue</span>
-                <button className="refresh-btn" onClick={handleRefresh} disabled={refreshing}>
+                <button
+                  className="refresh-btn"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                >
                   {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
                 </button>
               </div>
@@ -247,16 +312,23 @@ export default function ITDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {itCampaigns.map(c => (
+                      {itCampaigns.map((c) => (
                         <tr key={c._id}>
-                          <td className="msg-cell" title={c.message}>{c.message || "—"}</td>
+                          <td className="msg-cell" title={c.message}>
+                            {c.message || "—"}
+                          </td>
                           <td className="time-cell">{fmt(c.scheduleAt)}</td>
                           <td className="time-cell">{fmt(c.requestedAt)}</td>
-                          <td className="msg-cell" title={c.pmMessage}>{c.pmMessage || "—"}</td>
+                          <td className="msg-cell" title={c.pmMessage}>
+                            {c.pmMessage || "—"}
+                          </td>
                           <td><StatusBadge value={c.status} /></td>
                           <td><StatusBadge value={c.action} /></td>
                           <td>
-                            <button className="ack-btn" onClick={() => setAckTarget(c)}>
+                            <button
+                              className="ack-btn"
+                              onClick={() => setAckTarget(c)}
+                            >
                               ✓ Acknowledge
                             </button>
                           </td>
@@ -269,7 +341,7 @@ export default function ITDashboard() {
             </>
           )}
 
-          {/* ── RESET PASSWORD TAB ───────────────────────────────────── */}
+          {/* ── RESET PASSWORD TAB ─────────────────────────────────────── */}
           {tab === "password" && <ResetPassword />}
         </div>
       </div>
@@ -286,7 +358,7 @@ export default function ITDashboard() {
 
       {/* ── Toast notifications ── */}
       <div className="toast-container">
-        {toasts.map(t => (
+        {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type === "warn" ? "warn" : ""}`}>
             {t.msg}
           </div>
