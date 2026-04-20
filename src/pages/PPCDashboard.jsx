@@ -6,6 +6,8 @@
  * - TeamId field removed (issue #1) — uses auth store
  * - Local addNotification calls removed (issue #4) — socket-only
  * - Double campaign prevented in useCampaigns hook (issue #3)
+ * - FIX: requestedAt defaults to current time on create form
+ * - FIX: 24-hour time display via formatters
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -18,7 +20,7 @@ import { useLogout }                from "../hooks/useLogout.js";
 import { T, inputSx }              from "../constants/theme.js";
 import { STATUS_META, ACTION_META } from "../constants/statusMeta.js";
 import { FILTER_CARDS }             from "../constants/filterCards.js";
-import { fmt }                      from "../utils/formatters.js";
+import { fmt, toLocalISO }          from "../utils/formatters.js";
 
 import OpsGlobalStyles  from "../components/common/OpsGlobalStyles.jsx";
 import StatusBadge      from "../components/common/StatusBadge.jsx";
@@ -53,7 +55,8 @@ export default function PPCDashboard() {
   const [statusFilter,  setStatusFilter]  = useState(null);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [updateTarget,  setUpdateTarget]  = useState(null);
-  const [createForm,    setCreateForm]    = useState({ message: "", requestedAt: "" });
+  // FIX: default requestedAt to current local time so it's always pre-filled
+  const [createForm,    setCreateForm]    = useState({ message: "", requestedAt: toLocalISO(new Date()) });
   const [creating,      setCreating]      = useState(false);
   const [createError,   setCreateError]   = useState("");
   const [createOk,      setCreateOk]      = useState(false);
@@ -98,6 +101,10 @@ export default function PPCDashboard() {
   const goTo = section => {
     setActiveSection(section); setSidebarOpen(false);
     setCreateError(""); setCreateOk(false);
+    // FIX: reset form with fresh current time each time Create section is opened
+    if (section === "create") {
+      setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
+    }
   };
 
   const handleFilterSelect = useCallback(id => {
@@ -117,7 +124,7 @@ export default function PPCDashboard() {
         requestedAt: createForm.requestedAt || undefined,
         teamId,
       });
-      setCreateForm({ message: "", requestedAt: "" });
+      setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
       setCreateOk(true);
       // FIX: No local addNotification — socket fires the single notification
       setTimeout(() => { setActiveSection("campaigns"); setCreateOk(false); }, 1800);
@@ -284,7 +291,8 @@ export default function PPCDashboard() {
                       style={{ ...inputSx, resize:"vertical", lineHeight:1.6 }} />
                   </Field>
 
-                  <Field label="REQUESTED DATE / TIME" hint="optional">
+                  {/* FIX: pre-filled with current time; user can change or keep as-is */}
+                  <Field label="REQUESTED DATE / TIME" hint="defaults to now — change if needed">
                     <input type="datetime-local" className="ops-focus"
                       value={createForm.requestedAt}
                       onChange={e => setCreateForm(f => ({ ...f, requestedAt: e.target.value }))}

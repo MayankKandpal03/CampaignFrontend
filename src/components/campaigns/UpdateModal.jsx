@@ -13,13 +13,16 @@
  */
 import { useState, useEffect } from "react";
 import { T, inputSx } from "../../constants/theme.js";
+import { toLocalISO } from "../../utils/formatters.js";
 import Field from "../common/Field.jsx";
 
 export default function UpdateModal({ campaign, onClose, onSave }) {
   const [status,      setStatus]      = useState("transfer");
   const [message,     setMessage]     = useState(campaign?.message || "");
+  // FIX: use toLocalISO so the campaign's existing requestedAt is shown correctly
+  // instead of falling back to empty (which browsers render as 12:00)
   const [requestedAt, setRequestedAt] = useState(
-    campaign?.requestedAt?.slice?.(0, 16) || ""
+    toLocalISO(campaign?.requestedAt) || toLocalISO(new Date())
   );
   const [busy, setBusy] = useState(false);
   const [err,  setErr]  = useState("");
@@ -238,7 +241,7 @@ export default function UpdateModal({ campaign, onClose, onSave }) {
                 />
               </Field>
 
-              <Field label="REQUESTED DATE / TIME" hint="optional">
+              <Field label="REQUESTED DATE / TIME" hint="optional — pre-filled from existing value">
                 <input
                   type="datetime-local"
                   className="ops-focus"

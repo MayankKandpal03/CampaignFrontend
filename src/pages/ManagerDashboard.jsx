@@ -19,6 +19,9 @@
  *
  * 4. LOCAL STATE — Manager uses local campaigns state (like PMDashboard) so
  *    socket patches are always applied to the same array being rendered.
+ *
+ * 5. FIX: Create form requestedAt defaults to current time, reset with fresh
+ *    time each time the Create section is opened.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -32,7 +35,7 @@ import { useTeam }                  from "../hooks/useTeam.js";
 import { T, inputSx }              from "../constants/theme.js";
 import { STATUS_META, ACTION_META } from "../constants/statusMeta.js";
 import { FILTER_CARDS }             from "../constants/filterCards.js";
-import { initials, fmt }            from "../utils/formatters.js";
+import { initials, fmt, toLocalISO } from "../utils/formatters.js";
 import { fetchCampaigns, createCampaign as createCampaignService, updateCampaign as updateCampaignService } from "../services/campaignService.js";
 import { createUser, deleteUser }   from "../services/userService.js";
 
@@ -71,7 +74,8 @@ export default function ManagerDashboard() {
   const [deleteTarget,  setDeleteTarget] = useState(null);
   const [statusFilter,  setStatusFilter] = useState(null);
   const [searchQuery,   setSearchQuery]  = useState("");
-  const [createForm,    setCreateForm]   = useState({ message: "", requestedAt: "" });
+  // FIX: default requestedAt to current local time
+  const [createForm,    setCreateForm]   = useState({ message: "", requestedAt: toLocalISO(new Date()) });
   const [creating,      setCreating]     = useState(false);
   const [createError,   setCreateError]  = useState("");
   const [createOk,      setCreateOk]     = useState(false);
@@ -81,26 +85,14 @@ export default function ManagerDashboard() {
   const [userOk,        setUserOk]       = useState(false);
 
   // ── Socket — explicit handlers so manager gets ALL relevant real-time events ──
-  // The useSocket ref pattern ensures these handlers always call the latest
-  // setCampaigns / addNotification, never stale closures.
   useSocket({
-    /**
-     * PPC or Manager created a campaign.
-     * Backend sends this to manager via room:user_{managerId}.
-     */
     "campaign:created": c => {
       setCampaigns(prev => {
-        if (prev.some(x => x._id === c._id)) return prev; // dedup
+        if (prev.some(x => x._id === c._id)) return prev;
         return [c, ...prev];
       });
       addNotification(`Campaign created by ${c.performerName || "someone"}`);
     },
-
-    /**
-     * PPC, Manager, or PM updated/cancelled a campaign.
-     * Manager receives via room:user_{managerId} (for PPC actions)
-     * or room:team_* (for PM actions).
-     */
     "campaign:updated": c => {
       setCampaigns(prev => prev.map(x => x._id === c._id ? c : x));
       const msg = c.status === "cancel" || c.action === "cancel"
@@ -108,20 +100,10 @@ export default function ManagerDashboard() {
         : `Campaign updated by ${c.performerName || "someone"}`;
       addNotification(msg);
     },
-
-    /**
-     * PM approved campaign — forwarded to IT.
-     * Manager receives via room:team_*.
-     */
     "campaign:it_queued": c => {
       setCampaigns(prev => prev.map(x => x._id === c._id ? c : x));
       addNotification(`Campaign approved by ${c.performerName || "PM"} — sent to IT`);
     },
-
-    /**
-     * IT acknowledged a campaign (done or not done).
-     * Manager receives via room:team_*.
-     */
     "campaign:it_ack": c => {
       setCampaigns(prev => prev.map(x => x._id === c._id ? c : x));
       const msg = c.acknowledgement === "done"
@@ -129,7 +111,6 @@ export default function ManagerDashboard() {
         : `${c.performerName || "IT"} could not complete campaign`;
       addNotification(msg);
     },
-
     "campaign:deleted": d => {
       setCampaigns(prev => prev.filter(x => x._id !== d._id));
     },
@@ -187,6 +168,10 @@ export default function ManagerDashboard() {
     setActiveSection(section); setSidebarOpen(false);
     setCreateError(""); setCreateOk(false);
     setUserError(""); setUserOk(false);
+    // FIX: reset create form with fresh current time each time Create is opened
+    if (section === "create") {
+      setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
+    }
   };
 
   const handleCreate = useCallback(async e => {
@@ -201,14 +186,15 @@ export default function ManagerDashboard() {
         requestedAt: createForm.requestedAt || undefined,
         teamId,
       });
-      // Add to local state (socket will also fire but dedup handles it)
       if (newCampaign) {
         setCampaigns(prev => {
           if (prev.some(x => x._id === newCampaign._id)) return prev;
           return [newCampaign, ...prev];
         });
       }
-      setCreateForm({ message: "", requestedAt: "" }); setCreateOk(true);
+      // Reset with fresh current time after successful submit
+      setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
+      setCreateOk(true);
       setTimeout(() => { setActiveSection("campaigns"); setCreateOk(false); }, 1800);
     } catch (err) { setCreateError(err?.response?.data?.message || "Failed to create campaign."); }
     finally       { setCreating(false); }
@@ -288,7 +274,6 @@ export default function ManagerDashboard() {
                   sub={searchQuery || statusFilter ? "Adjust search or filter." : "No team campaigns yet."}
                   action={!searchQuery && !statusFilter ? <GoldBtn variant="outline" onClick={() => goTo("create")}>CREATE CAMPAIGN</GoldBtn> : null} />
               ) : (
-                /* FIX: overflowX:auto so all columns scroll on small screens */
                 <div style={{ overflowX:"auto", WebkitOverflowScrolling:"touch" }}>
                   <table style={{ width:"100%", borderCollapse:"collapse", minWidth:760 }}>
                     <thead>
@@ -395,7 +380,8 @@ export default function ManagerDashboard() {
                       placeholder="Describe the campaign request…" rows={4} required
                       style={{ ...inputSx, resize:"vertical", lineHeight:1.6 }} />
                   </Field>
-                  <Field label="REQUESTED DATE / TIME" hint="optional">
+                  {/* FIX: pre-filled with current time; user can change or keep as-is */}
+                  <Field label="REQUESTED DATE / TIME" hint="defaults to now — change if needed">
                     <input type="datetime-local" className="ops-focus" value={createForm.requestedAt}
                       onChange={e => setCreateForm(f => ({ ...f, requestedAt: e.target.value }))}
                       style={{ ...inputSx, colorScheme:"dark" }} />

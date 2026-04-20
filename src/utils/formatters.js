@@ -3,13 +3,14 @@
  * Previously duplicated in PPCDashboard, ManagerDashboard, PMDashboard, and ITDashboard.
  */
 
-/** Full date + time: DD/MM/YYYY, HH:MM */
+/** Full date + time: DD/MM/YYYY, HH:MM (24-hour) */
 export const fmt = (d) => {
   if (!d) return "—";
   try {
     return new Date(d).toLocaleString("en-IN", {
       day: "2-digit", month: "2-digit", year: "numeric",
       hour: "2-digit", minute: "2-digit",
+      hour12: false,
     });
   } catch { return d; }
 };
@@ -24,12 +25,13 @@ export const fmtDate = (d) => {
   } catch { return d; }
 };
 
-/** Time only: HH:MM */
+/** Time only: HH:MM (24-hour) */
 export const fmtTime = (d) => {
   if (!d) return "—";
   try {
     return new Date(d).toLocaleTimeString("en-IN", {
       hour: "2-digit", minute: "2-digit",
+      hour12: false,
     });
   } catch { return d; }
 };
