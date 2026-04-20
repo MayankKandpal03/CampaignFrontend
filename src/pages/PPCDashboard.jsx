@@ -8,6 +8,7 @@
  * - Double campaign prevented in useCampaigns hook (issue #3)
  * - FIX: requestedAt defaults to current time on create form
  * - FIX: 24-hour time display via formatters
+ * - FIX: Ticket state correctly shows NOT DONE / CANCELLED / CLOSED
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -55,7 +56,6 @@ export default function PPCDashboard() {
   const [statusFilter,  setStatusFilter]  = useState(null);
   const [searchQuery,   setSearchQuery]   = useState("");
   const [updateTarget,  setUpdateTarget]  = useState(null);
-  // FIX: default requestedAt to current local time so it's always pre-filled
   const [createForm,    setCreateForm]    = useState({ message: "", requestedAt: toLocalISO(new Date()) });
   const [creating,      setCreating]      = useState(false);
   const [createError,   setCreateError]   = useState("");
@@ -69,7 +69,6 @@ export default function PPCDashboard() {
     })();
   }, [getCampaign]); // eslint-disable-line
 
-  // teamId: from auth store (set at login), fallback from loaded campaigns
   const teamId = useMemo(() => {
     if (storedTeamId) return storedTeamId;
     const raw = campaigns[0]?.teamId;
@@ -101,7 +100,6 @@ export default function PPCDashboard() {
   const goTo = section => {
     setActiveSection(section); setSidebarOpen(false);
     setCreateError(""); setCreateOk(false);
-    // FIX: reset form with fresh current time each time Create section is opened
     if (section === "create") {
       setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
     }
@@ -126,7 +124,6 @@ export default function PPCDashboard() {
       });
       setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
       setCreateOk(true);
-      // FIX: No local addNotification — socket fires the single notification
       setTimeout(() => { setActiveSection("campaigns"); setCreateOk(false); }, 1800);
     } catch (err) {
       setCreateError(err?.response?.data?.message || "Failed to create campaign.");
@@ -135,7 +132,6 @@ export default function PPCDashboard() {
 
   const handleUpdate = useCallback(async (id, data) => {
     await updateCampaign(id, data);
-    // FIX: No local addNotification — socket fires the single notification
   }, [updateCampaign]);
 
   const NAV = [
@@ -237,8 +233,16 @@ export default function PPCDashboard() {
                                   style={{ padding:"4px 12px", borderRadius:2, background:T.amberBg, border:`1px solid ${T.amber}44`, color:T.amber, fontSize:9, fontWeight:700, letterSpacing:"0.12em", cursor:"pointer", fontFamily:"'Cinzel',serif" }}>
                                   UPDATE
                                 </button>
-                              : <span style={{ fontSize:9, letterSpacing:"0.12em", fontWeight:700, color: c.status==="cancel" ? T.red : T.green, fontFamily:"'Cinzel',serif" }}>
-                                  {c.status === "cancel" ? "CANCELLED" : "CLOSED"}
+                              : <span style={{
+                                  fontSize:9, letterSpacing:"0.12em", fontWeight:700,
+                                  color: c.status === "cancel"   ? T.red
+                                       : c.status === "not done" ? T.amber
+                                       : T.green,
+                                  fontFamily:"'Cinzel',serif"
+                                }}>
+                                  {c.status === "cancel"    ? "CANCELLED"
+                                   : c.status === "not done" ? "NOT DONE"
+                                   : "CLOSED"}
                                 </span>}
                           </td>
                         </tr>
@@ -271,7 +275,6 @@ export default function PPCDashboard() {
               <div style={{ background:T.bgCard, border:`1px solid ${T.goldBorder}`, borderRadius:4, padding: isMobile ? "22px 18px" : "28px 26px 24px" }}>
                 <h2 style={{ margin:"0 0 22px", fontSize:15, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif", letterSpacing:"0.08em" }}>Create Campaign</h2>
 
-                {/* Team status indicator */}
                 <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:T.bgInput, border:`1px solid ${teamId ? T.subtle : `${T.red}44`}`, borderRadius:3, marginBottom:20 }}>
                   <span style={{ width:6, height:6, borderRadius:"50%", background: teamId ? T.green : T.red, flexShrink:0 }} />
                   <span style={{ fontSize:11, color: teamId ? T.muted : T.red, fontFamily:"'JetBrains Mono',monospace" }}>
@@ -291,7 +294,6 @@ export default function PPCDashboard() {
                       style={{ ...inputSx, resize:"vertical", lineHeight:1.6 }} />
                   </Field>
 
-                  {/* FIX: pre-filled with current time; user can change or keep as-is */}
                   <Field label="REQUESTED DATE / TIME" hint="defaults to now — change if needed">
                     <input type="datetime-local" className="ops-focus"
                       value={createForm.requestedAt}

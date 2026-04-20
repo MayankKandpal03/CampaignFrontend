@@ -2,22 +2,11 @@
 /**
  * ITDashboard — updated.
  *
- * Changes vs previous version:
- *
- * 1. useSocket added with handlers for all relevant campaign events.
- *    The backend now pushes campaign:it_queued to room:it at the exact
- *    scheduled moment. Without these handlers the IT dashboard had no
- *    socket listener and would never receive the real-time push.
- *
- * 2. "Not done" acknowledgement now results in status === "cancel" /
- *    action === "cancel" from the backend, so the itCampaigns filter
- *    (action !== "approve") naturally removes it from the queue without
- *    any frontend logic change.
- *
- * 3. 60-second auto-refresh is kept as a safety net for the edge case
- *    where the server was restarted and restoreScheduledDeliveries has
- *    not yet fired (e.g. a deployment race). The socket push is the
- *    primary mechanism.
+ * CHANGES:
+ * 1. Removed "Campaign Message" (PPC message) column — only PM Note shown (req 3a)
+ * 2. itCampaigns filter now excludes any acknowledged campaign (done OR not done)
+ *    so "not done" campaigns disappear from the queue making them uneditable (req 3b)
+ * 3. All other logic unchanged
  */
 import { useEffect, useState, useCallback, useRef } from "react";
 
@@ -65,15 +54,7 @@ export default function ITDashboard() {
   useEffect(() => { getCampaign().catch(console.error); }, [getCampaign]);
 
   // ── Real-time socket handlers ──────────────────────────────────────────────
-  // These are the primary delivery mechanism for Issue 3. The backend pushes
-  // campaign:it_queued to room:it at the exact scheduled time via setTimeout.
-  // Without this hook the IT dashboard would never receive those pushes.
   useSocket({
-    /**
-     * A campaign just became due (either immediately on PM approve, or at
-     * the scheduled time for future campaigns). Add it to the store if it
-     * isn't there yet; patch it if it is (handles re-approvals).
-     */
     "campaign:it_queued": (c) => {
       useCampaignStore.setState((s) => {
         const exists = s.campaigns.some((x) => x._id === c._id);
@@ -88,20 +69,12 @@ export default function ITDashboard() {
       );
     },
 
-    /**
-     * PM cancelled or updated a campaign that is currently in the IT list.
-     * Patch it so the UI reflects the latest state without a reload.
-     */
     "campaign:updated": (c) => {
       useCampaignStore.setState((s) => ({
         campaigns: s.campaigns.map((x) => (x._id === c._id ? c : x)),
       }));
     },
 
-    /**
-     * Another IT user acknowledged a campaign — keep the shared queue
-     * consistent across all logged-in IT agents.
-     */
     "campaign:it_ack": (c) => {
       useCampaignStore.setState((s) => ({
         campaigns: s.campaigns.map((x) => (x._id === c._id ? c : x)),
@@ -122,16 +95,14 @@ export default function ITDashboard() {
   }, [getCampaign]);
 
   // ── Derived campaign list ──────────────────────────────────────────────────
-  // Filters applied here mirror the backend getCampaignService IT branch:
-  //   • action must be "approve"  (not done → action becomes "cancel" → excluded)
-  //   • status must not be "cancel"
-  //   • not already acknowledged as "done"
-  //   • scheduleAt (if set) must be ≤ now  (future-scheduled not shown yet)
+  // FIX (req 3b): exclude any campaign that has been acknowledged (done OR not done).
+  // Previously only "done" was excluded; "not done" campaigns stayed in the queue.
   const now = Date.now();
   const itCampaigns = campaigns.filter((c) => {
-    if (c.action !== "approve")       return false;
-    if (c.status  === "cancel")       return false;
-    if (c.acknowledgement === "done") return false;
+    if (c.action !== "approve")  return false;
+    if (c.status  === "cancel")  return false;
+    // Exclude once acknowledged — covers both "done" and "not done"
+    if (c.acknowledgement)       return false;
     if (c.scheduleAt) {
       return new Date(c.scheduleAt).getTime() <= now;
     }
@@ -170,7 +141,7 @@ export default function ITDashboard() {
         addNotification(
           `⚠ IT: "${ackTarget.message?.slice(0, 30)}…" marked Not Done — Reason: ${itMessage}`
         );
-        pushToast("Campaign marked Not Done. Status set to Cancelled.", "warn");
+        pushToast("Campaign marked Not Done.", "warn");
       }
       setAckTarget(null);
     } catch {
@@ -302,10 +273,10 @@ export default function ITDashboard() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Campaign Message</th>
+                        {/* req 3a: PPC message removed — only PM Note shown */}
+                        <th>PM Note</th>
                         <th>Scheduled At</th>
                         <th>Requested At</th>
-                        <th>PM Note</th>
                         <th>Status</th>
                         <th>Action</th>
                         <th>Acknowledge</th>
@@ -314,17 +285,17 @@ export default function ITDashboard() {
                     <tbody>
                       {itCampaigns.map((c) => (
                         <tr key={c._id}>
-                          <td className="msg-cell" title={c.message}>
-                            {c.message || "—"}
-                          </td>
-                          <td className="time-cell">{fmt(c.scheduleAt)}</td>
-                          <td className="time-cell">{fmt(c.requestedAt)}</td>
+                          {/* PM Note only — PPC message column removed */}
                           <td className="msg-cell" title={c.pmMessage}>
                             {c.pmMessage || "—"}
                           </td>
+                          <td className="time-cell">{fmt(c.scheduleAt)}</td>
+                          <td className="time-cell">{fmt(c.requestedAt)}</td>
                           <td><StatusBadge value={c.status} /></td>
                           <td><StatusBadge value={c.action} /></td>
                           <td>
+                            {/* req 3b: button only visible while in queue;
+                                once acknowledged the row is filtered out */}
                             <button
                               className="ack-btn"
                               onClick={() => setAckTarget(c)}

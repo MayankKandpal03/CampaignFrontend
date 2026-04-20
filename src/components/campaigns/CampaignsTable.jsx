@@ -2,12 +2,11 @@
 /**
  * CampaignsTable — PM's filterable, searchable campaign table.
  *
- * FIX: Added `filterCards` prop (default PM_FILTER_CARDS).
- *   PMDashboard now passes OPEN_REQUEST_FILTER_CARDS or
- *   CLOSED_REQUEST_FILTER_CARDS so each section shows only the
- *   relevant status cards instead of all four every time.
- *
- * All other columns and logic unchanged.
+ * CHANGES:
+ * - Added PM ACTION column (requirement 2a)
+ * - SCHEDULE AT only shown when campaign is approved (requirement 2b)
+ * - Ticket state handles "not done" status (requirement 1c)
+ * - isClosed now also catches acknowledgement truthy (covers "not done" ack)
  */
 import { useState, useMemo } from "react";
 import { T, inputSx }        from "../../constants/theme.js";
@@ -18,7 +17,7 @@ import PendingBadge          from "../common/PendingBadge.jsx";
 import { fmt, initials }     from "../../utils/formatters.js";
 
 const COLS = [
-  "CREATED BY", "PPC MESSAGE", "PM COMMENT",
+  "CREATED BY", "PPC MESSAGE", "PM COMMENT", "PM ACTION",
   "REQUESTED TIME", "SCHEDULE AT", "IT COMMENT", "TICKET STATE",
 ];
 
@@ -29,13 +28,11 @@ export default function CampaignsTable({
   isMobile,
   title         = "ALL CAMPAIGNS",
   showActionBtn = true,
-  // FIX: callers can now pass their own card set; default keeps existing behaviour
   filterCards   = PM_FILTER_CARDS,
 }) {
   const [search,       setSearch]       = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
 
-  // Stats cover every possible card id so any card set works without extra code
   const stats = useMemo(() => ({
     pending:  campaigns.filter(c => !c.action).length,
     approve:  campaigns.filter(c => c.action === "approve").length,
@@ -69,7 +66,7 @@ export default function CampaignsTable({
 
   return (
     <div>
-      {/* Filter cards — uses whatever set the parent passed in */}
+      {/* Filter cards */}
       <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
         {filterCards.map(card => {
           const active = statusFilter === card.id;
@@ -136,7 +133,7 @@ export default function CampaignsTable({
           </div>
         ) : (
           <div style={{ overflowX:"auto" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", minWidth:980 }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", minWidth:1060 }}>
               <thead>
                 <tr style={{ borderBottom:`1px solid ${T.subtle}`, background:`${T.bg}dd` }}>
                   {COLS.map(h => (
@@ -146,12 +143,31 @@ export default function CampaignsTable({
               </thead>
               <tbody>
                 {filtered.map((c, i) => {
-                  // createdBy is now always populated from backend
                   const creatorName = typeof c.createdBy === "object"
                     ? c.createdBy?.username
                     : null;
-                  const isClosed = c.status === "cancel" || c.action === "cancel" || c.status === "done" || c.acknowledgement;
-                  const canAct   = !isClosed && showActionBtn;
+
+                  // A campaign is closed (uneditable) when:
+                  // - status is cancel/done/not done
+                  // - action is cancel
+                  // - IT has acknowledged (done or not done)
+                  const isClosed =
+                    c.status === "cancel"  ||
+                    c.status === "done"    ||
+                    c.status === "not done" ||
+                    c.action === "cancel"  ||
+                    Boolean(c.acknowledgement);
+                  const canAct = !isClosed && showActionBtn;
+
+                  // Ticket state label + colour for closed campaigns
+                  const ticketLabel =
+                    c.status === "cancel" || c.action === "cancel" ? "CANCELLED" :
+                    c.status === "not done" ? "NOT DONE" :
+                    "CLOSED";
+                  const ticketColor =
+                    c.status === "cancel" || c.action === "cancel" ? T.red :
+                    c.status === "not done" ? T.amber :
+                    T.green;
 
                   return (
                     <tr key={c._id} className="ops-row"
@@ -183,14 +199,21 @@ export default function CampaignsTable({
                           : <span style={{ fontSize:11, color:T.subtle, fontFamily:"'JetBrains Mono',monospace" }}>—</span>}
                       </td>
 
+                      {/* PM ACTION */}
+                      <td style={{ padding:"12px 14px", whiteSpace:"nowrap" }}>
+                        {c.action
+                          ? <StatusBadge value={c.action} meta={ACTION_META} />
+                          : <PendingBadge />}
+                      </td>
+
                       {/* REQUESTED TIME */}
                       <td style={{ padding:"12px 14px", whiteSpace:"nowrap" }}>
                         <span style={{ fontSize:11, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{fmt(c.requestedAt)}</span>
                       </td>
 
-                      {/* SCHEDULE AT */}
+                      {/* SCHEDULE AT — only show once campaign is approved */}
                       <td style={{ padding:"12px 14px", whiteSpace:"nowrap" }}>
-                        {c.scheduleAt
+                        {c.action === "approve" && c.scheduleAt
                           ? <span style={{ fontSize:11, color:T.purple, fontFamily:"'JetBrains Mono',monospace" }}>{fmt(c.scheduleAt)}</span>
                           : <span style={{ fontSize:11, color:T.subtle, fontFamily:"'JetBrains Mono',monospace" }}>—</span>}
                       </td>
@@ -210,8 +233,8 @@ export default function CampaignsTable({
                             UPDATE
                           </button>
                         ) : (
-                          <span style={{ fontSize:9, letterSpacing:"0.12em", fontWeight:700, color:(c.status==="cancel"||c.action==="cancel") ? T.red : T.green, fontFamily:"'Cinzel',serif" }}>
-                            {(c.status==="cancel"||c.action==="cancel") ? "CANCELLED" : "CLOSED"}
+                          <span style={{ fontSize:9, letterSpacing:"0.12em", fontWeight:700, color:ticketColor, fontFamily:"'Cinzel',serif" }}>
+                            {ticketLabel}
                           </span>
                         )}
                       </td>

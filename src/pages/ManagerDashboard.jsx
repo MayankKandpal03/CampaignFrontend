@@ -1,27 +1,9 @@
 /**
  * ManagerDashboard — fully fixed for real-time notifications and updates.
  *
- * FIXES:
- *
- * 1. REAL-TIME — Manager now uses explicit useSocket() handlers instead of
- *    relying solely on useCampaigns(). This ensures:
- *    - PPC creates campaign → manager sees it immediately + notification
- *    - PPC updates campaign → manager sees it immediately + notification
- *    - PM approves/cancels → manager sees it immediately + notification
- *    - IT acknowledges    → manager sees it immediately + notification
- *
- * 2. STALE CLOSURE — useSocket now uses the ref pattern so handlers always
- *    call the latest addNotification / setCampaigns, never stale captures.
- *
- * 3. COLUMNS — All columns visible on all screen sizes via overflowX scroll.
- *    Columns: Created By | Message | Requested Time | Status | PM Action | Ticket State
- *    No columns hidden at any breakpoint.
- *
- * 4. LOCAL STATE — Manager uses local campaigns state (like PMDashboard) so
- *    socket patches are always applied to the same array being rendered.
- *
- * 5. FIX: Create form requestedAt defaults to current time, reset with fresh
- *    time each time the Create section is opened.
+ * CHANGES:
+ * - Ticket state correctly shows NOT DONE / CANCELLED / CLOSED (requirement 1c/1b)
+ * - All other logic unchanged
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -54,7 +36,6 @@ import UpdateModal      from "../components/campaigns/UpdateModal.jsx";
 import DeleteUserModal  from "../components/users/DeleteUserModal.jsx";
 import UserCard         from "../components/users/UserCard.jsx";
 
-// Fixed columns — always shown, no hiding at breakpoints
 const COLS = ["CREATED BY", "MESSAGE", "REQUESTED TIME", "STATUS", "PM ACTION", "TICKET STATE"];
 
 export default function ManagerDashboard() {
@@ -64,7 +45,6 @@ export default function ManagerDashboard() {
   const isMobile        = useResponsive();
   const { teamInfo, teamLoading, loadTeamInfo } = useTeam();
 
-  // ── Local campaigns state (same pattern as PMDashboard for reliability) ──
   const [campaigns,     setCampaigns]    = useState([]);
   const [camLoading,    setCamLoading]   = useState(true);
   const [pageError,     setPageError]    = useState("");
@@ -74,7 +54,6 @@ export default function ManagerDashboard() {
   const [deleteTarget,  setDeleteTarget] = useState(null);
   const [statusFilter,  setStatusFilter] = useState(null);
   const [searchQuery,   setSearchQuery]  = useState("");
-  // FIX: default requestedAt to current local time
   const [createForm,    setCreateForm]   = useState({ message: "", requestedAt: toLocalISO(new Date()) });
   const [creating,      setCreating]     = useState(false);
   const [createError,   setCreateError]  = useState("");
@@ -84,7 +63,6 @@ export default function ManagerDashboard() {
   const [userError,     setUserError]    = useState("");
   const [userOk,        setUserOk]       = useState(false);
 
-  // ── Socket — explicit handlers so manager gets ALL relevant real-time events ──
   useSocket({
     "campaign:created": c => {
       setCampaigns(prev => {
@@ -116,7 +94,6 @@ export default function ManagerDashboard() {
     },
   });
 
-  // ── Load on mount ────────────────────────────────────────────────────────────
   useEffect(() => {
     (async () => {
       try {
@@ -127,7 +104,6 @@ export default function ManagerDashboard() {
     })();
   }, []); // eslint-disable-line
 
-  // ── Derived state ─────────────────────────────────────────────────────────────
   const teamId = useMemo(() => {
     if (teamInfo?._id) return teamInfo._id;
     const raw = campaigns[0]?.teamId;
@@ -163,12 +139,10 @@ export default function ManagerDashboard() {
     return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [campaigns, statusFilter, searchQuery]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────────
   const goTo = section => {
     setActiveSection(section); setSidebarOpen(false);
     setCreateError(""); setCreateOk(false);
     setUserError(""); setUserOk(false);
-    // FIX: reset create form with fresh current time each time Create is opened
     if (section === "create") {
       setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
     }
@@ -180,7 +154,6 @@ export default function ManagerDashboard() {
     if (!createForm.message.trim()) { setCreateError("Campaign message is required."); return; }
     setCreating(true);
     try {
-      // FIX: no local addNotification — socket fires the single notification
       const newCampaign = await createCampaignService({
         message:     createForm.message.trim(),
         requestedAt: createForm.requestedAt || undefined,
@@ -192,7 +165,6 @@ export default function ManagerDashboard() {
           return [newCampaign, ...prev];
         });
       }
-      // Reset with fresh current time after successful submit
       setCreateForm({ message: "", requestedAt: toLocalISO(new Date()) });
       setCreateOk(true);
       setTimeout(() => { setActiveSection("campaigns"); setCreateOk(false); }, 1800);
@@ -204,7 +176,6 @@ export default function ManagerDashboard() {
     const updated = await updateCampaignService(campaignId, data);
     if (updated) {
       setCampaigns(prev => prev.map(c => c._id === updated._id ? updated : c));
-      // FIX: no local addNotification — socket fires the single notification
     }
   }, []);
 
@@ -231,7 +202,6 @@ export default function ManagerDashboard() {
     { id: "team",      label: "Team Members",   count: ppcMembers.length },
   ];
 
-  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ display:"flex", minHeight:"100vh", background:T.bg, color:T.text, fontFamily:"'DM Sans',sans-serif" }}>
       <OpsGlobalStyles />
@@ -333,8 +303,16 @@ export default function ManagerDashboard() {
                                     style={{ padding:"4px 12px", borderRadius:2, background:T.amberBg, border:`1px solid ${T.amber}44`, color:T.amber, fontSize:9, fontWeight:700, letterSpacing:"0.12em", cursor:"pointer", fontFamily:"'Cinzel',serif" }}>
                                     UPDATE
                                   </button>
-                                : <span style={{ fontSize:9, letterSpacing:"0.12em", fontWeight:700, color: c.status==="cancel" ? T.red : T.green, fontFamily:"'Cinzel',serif" }}>
-                                    {c.status === "cancel" ? "CANCELLED" : "CLOSED"}
+                                : <span style={{
+                                    fontSize:9, letterSpacing:"0.12em", fontWeight:700,
+                                    color: c.status === "cancel"   ? T.red
+                                         : c.status === "not done" ? T.amber
+                                         : T.green,
+                                    fontFamily:"'Cinzel',serif"
+                                  }}>
+                                    {c.status === "cancel"    ? "CANCELLED"
+                                     : c.status === "not done" ? "NOT DONE"
+                                     : "CLOSED"}
                                   </span>}
                             </td>
                           </tr>
@@ -380,7 +358,6 @@ export default function ManagerDashboard() {
                       placeholder="Describe the campaign request…" rows={4} required
                       style={{ ...inputSx, resize:"vertical", lineHeight:1.6 }} />
                   </Field>
-                  {/* FIX: pre-filled with current time; user can change or keep as-is */}
                   <Field label="REQUESTED DATE / TIME" hint="defaults to now — change if needed">
                     <input type="datetime-local" className="ops-focus" value={createForm.requestedAt}
                       onChange={e => setCreateForm(f => ({ ...f, requestedAt: e.target.value }))}
@@ -401,7 +378,6 @@ export default function ManagerDashboard() {
         {activeSection === "team" && (
           <div style={{ padding: isMobile ? "16px 14px" : "22px 28px", flex:1 }}>
             <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap:24, alignItems:"start" }}>
-              {/* Add PPC form */}
               <div style={{ background:T.bgCard, border:`1px solid ${T.goldBorder}`, borderRadius:4, padding:"24px 22px" }}>
                 <p style={{ margin:"0 0 4px", fontSize:8, letterSpacing:"0.22em", color:T.gold, fontFamily:"'Cinzel',serif" }}>— ADD MEMBER</p>
                 <h2 style={{ margin:"0 0 20px", fontSize:15, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>Add PPC Member</h2>
@@ -417,7 +393,6 @@ export default function ManagerDashboard() {
                 </form>
               </div>
 
-              {/* PPC member list */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
                   <p style={{ margin:0, fontSize:8, color:T.muted, letterSpacing:"0.2em", fontFamily:"'Cinzel',serif" }}>TEAM MEMBERS ·</p>
