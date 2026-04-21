@@ -3,12 +3,11 @@
  * ITDashboard — updated.
  *
  * CHANGES:
- * 1. Removed "Campaign Message" (PPC message) column — only PM Note shown (req 3a)
- * 2. itCampaigns filter now excludes any acknowledged campaign (done OR not done)
- *    so "not done" campaigns disappear from the queue making them uneditable (req 3b)
- * 3. All other logic unchanged
+ * - Removed Reset Password nav item and section (req 3)
+ * - PPC message column already removed (prev change, kept)
+ * - itCampaigns excludes acknowledged campaigns (prev change, kept)
  */
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import useCampaignStore from "../stores/useCampaignStore.js";
 import useAuthStore     from "../stores/useAuthStore.js";
@@ -17,7 +16,6 @@ import { useSocket }    from "../hooks/useSocket.js";
 
 import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
-import ResetPassword     from "../components/auth/ResetPassword.jsx";
 
 import "../styles/it.css";
 
@@ -43,7 +41,6 @@ export default function ITDashboard() {
   const addNotification = useNotifStore(s => s.addNotification);
   const unread          = useNotifStore(s => s.unread);
 
-  const [tab,         setTab]         = useState("campaigns");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ackTarget,   setAckTarget]   = useState(null);
   const [ackLoading,  setAckLoading]  = useState(false);
@@ -88,20 +85,18 @@ export default function ITDashboard() {
     },
   });
 
-  // ── 60-second auto-refresh (safety net for server restarts) ───────────────
+  // ── 60-second auto-refresh ─────────────────────────────────────────────────
   useEffect(() => {
     const id = setInterval(() => getCampaign().catch(console.error), 60_000);
     return () => clearInterval(id);
   }, [getCampaign]);
 
   // ── Derived campaign list ──────────────────────────────────────────────────
-  // FIX (req 3b): exclude any campaign that has been acknowledged (done OR not done).
-  // Previously only "done" was excluded; "not done" campaigns stayed in the queue.
   const now = Date.now();
   const itCampaigns = campaigns.filter((c) => {
     if (c.action !== "approve")  return false;
     if (c.status  === "cancel")  return false;
-    // Exclude once acknowledged — covers both "done" and "not done"
+    // Exclude once acknowledged (done OR not done)
     if (c.acknowledgement)       return false;
     if (c.scheduleAt) {
       return new Date(c.scheduleAt).getTime() <= now;
@@ -151,11 +146,6 @@ export default function ITDashboard() {
     }
   };
 
-  const NAV = [
-    { id: "campaigns", icon: "📋", label: "Scheduled Campaigns" },
-    { id: "password",  icon: "🔑", label: "Reset Password"       },
-  ];
-
   return (
     <div className="it-root">
       <div
@@ -180,18 +170,8 @@ export default function ITDashboard() {
           </div>
         </div>
 
-        <nav className="sidebar-nav">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              className={`nav-item ${tab === n.id ? "active" : ""}`}
-              onClick={() => { setTab(n.id); setSidebarOpen(false); }}
-            >
-              <span className="nav-icon">{n.icon}</span>
-              {n.label}
-            </button>
-          ))}
-        </nav>
+        {/* No nav items needed — single view */}
+        <nav className="sidebar-nav" />
 
         <div className="sidebar-footer">
           <button className="logout-btn" onClick={logout}>
@@ -209,12 +189,8 @@ export default function ITDashboard() {
           >
             <span /><span /><span />
           </button>
-          <h1 className="header-title">
-            {tab === "campaigns" ? "Scheduled Campaigns" : "Reset Password"}
-          </h1>
-          {tab === "campaigns" && (
-            <span className="header-badge">{pendingCount} Pending</span>
-          )}
+          <h1 className="header-title">Scheduled Campaigns</h1>
+          <span className="header-badge">{pendingCount} Pending</span>
           <div
             className="notif-bell"
             title={`${unread} unread notifications`}
@@ -226,94 +202,81 @@ export default function ITDashboard() {
         </header>
 
         <div className="it-content">
+          <div className="stats-row">
+            <div className="stat-card">
+              <div className="stat-label">Pending Action</div>
+              <div className="stat-value">{pendingCount}</div>
+              <div className="stat-sub">Scheduled &amp; awaiting acknowledgement</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Completed</div>
+              <div className="stat-value">{doneCount}</div>
+              <div className="stat-sub">Acknowledged as done</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Total Approved</div>
+              <div className="stat-value">
+                {campaigns.filter((c) => c.action === "approve").length}
+              </div>
+              <div className="stat-sub">Approved by PM (all time)</div>
+            </div>
+          </div>
 
-          {/* ── CAMPAIGNS TAB ──────────────────────────────────────────── */}
-          {tab === "campaigns" && (
-            <>
-              <div className="stats-row">
-                <div className="stat-card">
-                  <div className="stat-label">Pending Action</div>
-                  <div className="stat-value">{pendingCount}</div>
-                  <div className="stat-sub">Scheduled &amp; awaiting acknowledgement</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">Completed</div>
-                  <div className="stat-value">{doneCount}</div>
-                  <div className="stat-sub">Acknowledged as done</div>
-                </div>
-                <div className="stat-card">
-                  <div className="stat-label">Total Approved</div>
-                  <div className="stat-value">
-                    {campaigns.filter((c) => c.action === "approve").length}
-                  </div>
-                  <div className="stat-sub">Approved by PM (all time)</div>
+          <div className="section-head">
+            <span className="section-title">Request Queue</span>
+            <button
+              className="refresh-btn"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
+            </button>
+          </div>
+
+          <div className="table-wrap">
+            {itCampaigns.length === 0 ? (
+              <div className="table-empty">
+                <div className="table-empty-icon">✅</div>
+                <div className="table-empty-text">
+                  No campaigns due yet. Queue is clear.
                 </div>
               </div>
-
-              <div className="section-head">
-                <span className="section-title">Request Queue</span>
-                <button
-                  className="refresh-btn"
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                >
-                  {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
-                </button>
-              </div>
-
-              <div className="table-wrap">
-                {itCampaigns.length === 0 ? (
-                  <div className="table-empty">
-                    <div className="table-empty-icon">✅</div>
-                    <div className="table-empty-text">
-                      No campaigns due yet. Queue is clear.
-                    </div>
-                  </div>
-                ) : (
-                  <table>
-                    <thead>
-                      <tr>
-                        {/* req 3a: PPC message removed — only PM Note shown */}
-                        <th>PM Note</th>
-                        <th>Scheduled At</th>
-                        <th>Requested At</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                        <th>Acknowledge</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {itCampaigns.map((c) => (
-                        <tr key={c._id}>
-                          {/* PM Note only — PPC message column removed */}
-                          <td className="msg-cell" title={c.pmMessage}>
-                            {c.pmMessage || "—"}
-                          </td>
-                          <td className="time-cell">{fmt(c.scheduleAt)}</td>
-                          <td className="time-cell">{fmt(c.requestedAt)}</td>
-                          <td><StatusBadge value={c.status} /></td>
-                          <td><StatusBadge value={c.action} /></td>
-                          <td>
-                            {/* req 3b: button only visible while in queue;
-                                once acknowledged the row is filtered out */}
-                            <button
-                              className="ack-btn"
-                              onClick={() => setAckTarget(c)}
-                            >
-                              ✓ Acknowledge
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* ── RESET PASSWORD TAB ─────────────────────────────────────── */}
-          {tab === "password" && <ResetPassword />}
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>PM Note</th>
+                    <th>Scheduled At</th>
+                    <th>Requested At</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                    <th>Acknowledge</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {itCampaigns.map((c) => (
+                    <tr key={c._id}>
+                      <td className="msg-cell" title={c.pmMessage}>
+                        {c.pmMessage || "—"}
+                      </td>
+                      <td className="time-cell">{fmt(c.scheduleAt)}</td>
+                      <td className="time-cell">{fmt(c.requestedAt)}</td>
+                      <td><StatusBadge value={c.status} /></td>
+                      <td><StatusBadge value={c.action} /></td>
+                      <td>
+                        <button
+                          className="ack-btn"
+                          onClick={() => setAckTarget(c)}
+                        >
+                          ✓ Acknowledge
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
 

@@ -1,18 +1,10 @@
 // src/pages/PMDashboard.jsx
 /**
- * PMDashboard — fixed.
+ * PMDashboard
  *
- * FIXES vs previous version:
- *
- * 1. Open Requests now shows pending (no PM action) + approved campaigns.
- *    Previously it only showed action==="approve" && !acknowledgement.
- *    Filter cards limited to OPEN_REQUEST_FILTER_CARDS (pending + approved).
- *
- * 2. Closed Requests now shows done + cancelled campaigns only.
- *    Filter cards limited to CLOSED_REQUEST_FILTER_CARDS (done + cancelled).
- *
- * 3. No other logic changed — socket handlers, user CRUD, campaign actions
- *    all remain identical.
+ * CHANGES:
+ * - Removed the "Waiting IT / IT Done / Done" stat cards from Open Requests (req 3)
+ * - All other logic unchanged
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -24,7 +16,6 @@ import { useSocket }                       from "../hooks/useSocket.js";
 import { useLogout }                       from "../hooks/useLogout.js";
 import { T }                               from "../constants/theme.js";
 import {
-  OPEN_REQUEST_CARDS,
   OPEN_REQUEST_FILTER_CARDS,
   CLOSED_REQUEST_FILTER_CARDS,
 } from "../constants/filterCards.js";
@@ -123,19 +114,10 @@ export default function PMDashboard() {
   }, [activeSection, loadUsers]);
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  /**
-   * FIX: Open Requests = campaigns pending PM review OR already approved.
-   * Previous: only approved & no-ack campaigns.
-   * Now PM can see everything that still needs attention in one place.
-   */
   const openRequests = useMemo(() =>
     campaigns.filter(c => !c.action || c.action === "approve")
   , [campaigns]);
 
-  /**
-   * FIX: Closed Requests = done OR cancelled only.
-   * Previous included acknowledgement-based filter which was redundant.
-   */
   const closedRequests = useMemo(() =>
     campaigns.filter(c =>
       c.status === "cancel" || c.action === "cancel" || c.status === "done"
@@ -145,12 +127,6 @@ export default function PMDashboard() {
   const totalUsers = useMemo(() =>
     users.filter(u => ["manager","ppc","it"].includes(u.role)).length
   , [users]);
-
-  const openStats = useMemo(() => ({
-    waiting: campaigns.filter(c => c.action === "approve" && !c.acknowledgement).length,
-    acked:   campaigns.filter(c => c.action === "approve" && c.acknowledgement === "done").length,
-    done:    campaigns.filter(c => c.status === "done").length,
-  }), [campaigns]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const goTo = section => { setActiveSection(section); setSidebarOpen(false); };
@@ -247,27 +223,7 @@ export default function PMDashboard() {
           {/* ── OPEN REQUESTS ─────────────────────────────────────────── */}
           {activeSection === "open-requests" && (
             <div style={{ animation:"opsFadeUp .22s ease" }}>
-              {/* Summary stat row (Waiting IT / IT Done / Done) */}
-              <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
-                {OPEN_REQUEST_CARDS.map(card => (
-                  <div key={card.id} style={{
-                    flex:"1 1 0", minWidth:120, padding:"14px 16px 12px", borderRadius:4,
-                    background:T.bgCard, border:`1px solid ${T.goldBorder}`, userSelect:"none",
-                  }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
-                      <span style={{ width:5, height:5, borderRadius:"50%", background:card.color, flexShrink:0 }} />
-                      <span style={{ fontSize:8, fontWeight:700, letterSpacing:"0.18em", color:T.muted, fontFamily:"'Cinzel',serif" }}>
-                        {card.label.toUpperCase()}
-                      </span>
-                    </div>
-                    <div style={{ fontSize:26, fontWeight:700, color:T.white, fontFamily:"'Cinzel',serif", lineHeight:1 }}>
-                      {openStats[card.id] ?? 0}
-                    </div>
-                    <div style={{ fontSize:9, color:T.muted, marginTop:4 }}>campaigns</div>
-                  </div>
-                ))}
-              </div>
-
+              {/* Info bar — stat cards removed (req 3) */}
               <div style={{ display:"flex", gap:12, alignItems:"center", marginBottom:20, padding:"12px 18px", background:T.bgCard, border:`1px solid ${T.teal}33`, borderRadius:4 }}>
                 <span style={{ width:8, height:8, borderRadius:"50%", background:T.teal, flexShrink:0, boxShadow:`0 0 8px ${T.teal}` }} />
                 <p style={{ margin:0, fontSize:12, color:T.muted, lineHeight:1.6 }}>
@@ -276,7 +232,6 @@ export default function PMDashboard() {
                 </p>
               </div>
 
-              {/* FIX: pass OPEN_REQUEST_FILTER_CARDS — shows only Pending + Approved cards */}
               <CampaignsTable
                 campaigns={openRequests}
                 loading={camLoading}
@@ -299,7 +254,6 @@ export default function PMDashboard() {
                 </p>
               </div>
 
-              {/* FIX: pass CLOSED_REQUEST_FILTER_CARDS — shows only Done + Cancelled cards */}
               <CampaignsTable
                 campaigns={closedRequests}
                 loading={camLoading}

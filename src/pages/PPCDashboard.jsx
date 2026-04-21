@@ -1,14 +1,10 @@
 /**
- * PPCDashboard — all issues fixed.
+ * PPCDashboard
  *
- * Columns: Message | Requested Time | Status | PM Action | Ticket State
- * - Timestamp removed (issue #9)
- * - TeamId field removed (issue #1) — uses auth store
- * - Local addNotification calls removed (issue #4) — socket-only
- * - Double campaign prevented in useCampaigns hook (issue #3)
- * - FIX: requestedAt defaults to current time on create form
- * - FIX: 24-hour time display via formatters
- * - FIX: Ticket state correctly shows NOT DONE / CANCELLED / CLOSED
+ * CHANGES:
+ * - Ticket state shows "SENT TO IT" (teal) when action === "approve"
+ *   and no acknowledgement yet — campaign is uneditable once approved.
+ * - UPDATE button only shown when status === "transfer" AND action is not set.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -202,51 +198,65 @@ export default function PPCDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((c, i) => (
-                        <tr key={c._id} className="ops-row"
-                          style={{ borderBottom:`1px solid ${T.subtle}22`, background: i%2===1 ? `${T.bgCard}88` : "transparent" }}>
+                      {filtered.map((c, i) => {
+                        // Determine ticket state:
+                        // 1. action === "approve" (any acknowledgement state) → locked, show label
+                        // 2. status !== "transfer" → locked, show label
+                        // 3. status === "transfer" and no action → show UPDATE button
+                        const isApproved = c.action === "approve";
+                        const isClosed   = c.status === "cancel" || c.status === "done" || c.status === "not done" || c.action === "cancel" || Boolean(c.acknowledgement);
+                        const canUpdate  = c.status === "transfer" && !isApproved && !isClosed;
 
-                          {/* MESSAGE */}
-                          <td style={{ padding:"12px 16px", minWidth:200, maxWidth:320 }}>
-                            <p style={{ margin:0, fontSize:12, color:T.text, lineHeight:1.55, wordBreak:"break-word", whiteSpace:"pre-wrap" }}>{c.message}</p>
-                          </td>
+                        const ticketLabel = isApproved && !c.acknowledgement
+                          ? "SENT TO IT"
+                          : c.status === "cancel" || c.action === "cancel" ? "CANCELLED"
+                          : c.status === "not done" ? "NOT DONE"
+                          : "CLOSED";
 
-                          {/* REQUESTED TIME */}
-                          <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
-                            <span style={{ fontSize:11, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{fmt(c.requestedAt)}</span>
-                          </td>
+                        const ticketColor = isApproved && !c.acknowledgement
+                          ? T.teal
+                          : c.status === "cancel" || c.action === "cancel" ? T.red
+                          : c.status === "not done" ? T.amber
+                          : T.green;
 
-                          {/* STATUS */}
-                          <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
-                            <StatusBadge value={c.status} meta={STATUS_META} />
-                          </td>
+                        return (
+                          <tr key={c._id} className="ops-row"
+                            style={{ borderBottom:`1px solid ${T.subtle}22`, background: i%2===1 ? `${T.bgCard}88` : "transparent" }}>
 
-                          {/* PM ACTION */}
-                          <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
-                            {c.action ? <StatusBadge value={c.action} meta={ACTION_META} /> : <PendingBadge />}
-                          </td>
+                            {/* MESSAGE */}
+                            <td style={{ padding:"12px 16px", minWidth:200, maxWidth:320 }}>
+                              <p style={{ margin:0, fontSize:12, color:T.text, lineHeight:1.55, wordBreak:"break-word", whiteSpace:"pre-wrap" }}>{c.message}</p>
+                            </td>
 
-                          {/* TICKET STATE */}
-                          <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
-                            {c.status === "transfer"
-                              ? <button className="ops-upd" onClick={() => setUpdateTarget(c)}
-                                  style={{ padding:"4px 12px", borderRadius:2, background:T.amberBg, border:`1px solid ${T.amber}44`, color:T.amber, fontSize:9, fontWeight:700, letterSpacing:"0.12em", cursor:"pointer", fontFamily:"'Cinzel',serif" }}>
-                                  UPDATE
-                                </button>
-                              : <span style={{
-                                  fontSize:9, letterSpacing:"0.12em", fontWeight:700,
-                                  color: c.status === "cancel"   ? T.red
-                                       : c.status === "not done" ? T.amber
-                                       : T.green,
-                                  fontFamily:"'Cinzel',serif"
-                                }}>
-                                  {c.status === "cancel"    ? "CANCELLED"
-                                   : c.status === "not done" ? "NOT DONE"
-                                   : "CLOSED"}
-                                </span>}
-                          </td>
-                        </tr>
-                      ))}
+                            {/* REQUESTED TIME */}
+                            <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
+                              <span style={{ fontSize:11, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{fmt(c.requestedAt)}</span>
+                            </td>
+
+                            {/* STATUS */}
+                            <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
+                              <StatusBadge value={c.status} meta={STATUS_META} />
+                            </td>
+
+                            {/* PM ACTION */}
+                            <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
+                              {c.action ? <StatusBadge value={c.action} meta={ACTION_META} /> : <PendingBadge />}
+                            </td>
+
+                            {/* TICKET STATE */}
+                            <td style={{ padding:"12px 16px", whiteSpace:"nowrap" }}>
+                              {canUpdate
+                                ? <button className="ops-upd" onClick={() => setUpdateTarget(c)}
+                                    style={{ padding:"4px 12px", borderRadius:2, background:T.amberBg, border:`1px solid ${T.amber}44`, color:T.amber, fontSize:9, fontWeight:700, letterSpacing:"0.12em", cursor:"pointer", fontFamily:"'Cinzel',serif" }}>
+                                    UPDATE
+                                  </button>
+                                : <span style={{ fontSize:9, letterSpacing:"0.12em", fontWeight:700, color:ticketColor, fontFamily:"'Cinzel',serif" }}>
+                                    {ticketLabel}
+                                  </span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

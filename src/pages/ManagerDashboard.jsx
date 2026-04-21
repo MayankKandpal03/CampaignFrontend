@@ -1,9 +1,10 @@
 /**
- * ManagerDashboard — fully fixed for real-time notifications and updates.
+ * ManagerDashboard
  *
  * CHANGES:
- * - Ticket state correctly shows NOT DONE / CANCELLED / CLOSED (requirement 1c/1b)
- * - All other logic unchanged
+ * - Ticket state shows "SENT TO IT" (teal) when action === "approve"
+ *   and no acknowledgement yet — campaign is uneditable once approved.
+ * - UPDATE button only shown when status === "transfer" AND action is not set.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -255,12 +256,27 @@ export default function ManagerDashboard() {
                     </thead>
                     <tbody>
                       {filtered.map((c, i) => {
-                        const creatorName = typeof c.createdBy === "object"
-                          ? c.createdBy?.username
-                          : null;
+                        const creatorName = typeof c.createdBy === "object" ? c.createdBy?.username : null;
                         const creatorId   = typeof c.createdBy === "object" ? c.createdBy?._id : c.createdBy;
                         const member      = teamInfo?.members?.find(m => String(m._id) === String(creatorId));
                         const isOwn       = !member;
+
+                        // Ticket state logic (same as PPCDashboard)
+                        const isApproved = c.action === "approve";
+                        const isClosed   = c.status === "cancel" || c.status === "done" || c.status === "not done" || c.action === "cancel" || Boolean(c.acknowledgement);
+                        const canUpdate  = c.status === "transfer" && !isApproved && !isClosed;
+
+                        const ticketLabel = isApproved && !c.acknowledgement
+                          ? "SENT TO IT"
+                          : c.status === "cancel" || c.action === "cancel" ? "CANCELLED"
+                          : c.status === "not done" ? "NOT DONE"
+                          : "CLOSED";
+
+                        const ticketColor = isApproved && !c.acknowledgement
+                          ? T.teal
+                          : c.status === "cancel" || c.action === "cancel" ? T.red
+                          : c.status === "not done" ? T.amber
+                          : T.green;
 
                         return (
                           <tr key={c._id} className="ops-row"
@@ -298,21 +314,13 @@ export default function ManagerDashboard() {
 
                             {/* TICKET STATE */}
                             <td style={{ padding:"12px 14px", whiteSpace:"nowrap" }}>
-                              {c.status === "transfer"
+                              {canUpdate
                                 ? <button className="ops-upd" onClick={() => setUpdateTarget(c)}
                                     style={{ padding:"4px 12px", borderRadius:2, background:T.amberBg, border:`1px solid ${T.amber}44`, color:T.amber, fontSize:9, fontWeight:700, letterSpacing:"0.12em", cursor:"pointer", fontFamily:"'Cinzel',serif" }}>
                                     UPDATE
                                   </button>
-                                : <span style={{
-                                    fontSize:9, letterSpacing:"0.12em", fontWeight:700,
-                                    color: c.status === "cancel"   ? T.red
-                                         : c.status === "not done" ? T.amber
-                                         : T.green,
-                                    fontFamily:"'Cinzel',serif"
-                                  }}>
-                                    {c.status === "cancel"    ? "CANCELLED"
-                                     : c.status === "not done" ? "NOT DONE"
-                                     : "CLOSED"}
+                                : <span style={{ fontSize:9, letterSpacing:"0.12em", fontWeight:700, color:ticketColor, fontFamily:"'Cinzel',serif" }}>
+                                    {ticketLabel}
                                   </span>}
                             </td>
                           </tr>

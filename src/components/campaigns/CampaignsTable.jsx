@@ -3,10 +3,10 @@
  * CampaignsTable — PM's filterable, searchable campaign table.
  *
  * CHANGES:
- * - Added PM ACTION column (requirement 2a)
- * - SCHEDULE AT only shown when campaign is approved (requirement 2b)
- * - Ticket state handles "not done" status (requirement 1c)
- * - isClosed now also catches acknowledgement truthy (covers "not done" ack)
+ * - Ticket state shows "SENT TO IT" (teal) when action === "approve" and no acknowledgement
+ * - SCHEDULE AT only shown when campaign is approved
+ * - PM ACTION column present
+ * - isClosed logic updated for not-done and acknowledgement
  */
 import { useState, useMemo } from "react";
 import { T, inputSx }        from "../../constants/theme.js";
@@ -143,31 +143,25 @@ export default function CampaignsTable({
               </thead>
               <tbody>
                 {filtered.map((c, i) => {
-                  const creatorName = typeof c.createdBy === "object"
-                    ? c.createdBy?.username
-                    : null;
+                  const creatorName = typeof c.createdBy === "object" ? c.createdBy?.username : null;
 
-                  // A campaign is closed (uneditable) when:
-                  // - status is cancel/done/not done
-                  // - action is cancel
-                  // - IT has acknowledged (done or not done)
-                  const isClosed =
-                    c.status === "cancel"  ||
-                    c.status === "done"    ||
-                    c.status === "not done" ||
-                    c.action === "cancel"  ||
-                    Boolean(c.acknowledgement);
-                  const canAct = !isClosed && showActionBtn;
+                  // Ticket state logic
+                  const isApproved = c.action === "approve";
+                  const isClosed   = c.status === "cancel" || c.status === "done" || c.status === "not done" || c.action === "cancel" || Boolean(c.acknowledgement);
+                  // PM can still act (UPDATE button) on campaigns that are pending (no action yet) and not otherwise closed
+                  const canAct = !isApproved && !isClosed && showActionBtn;
 
-                  // Ticket state label + colour for closed campaigns
-                  const ticketLabel =
-                    c.status === "cancel" || c.action === "cancel" ? "CANCELLED" :
-                    c.status === "not done" ? "NOT DONE" :
-                    "CLOSED";
-                  const ticketColor =
-                    c.status === "cancel" || c.action === "cancel" ? T.red :
-                    c.status === "not done" ? T.amber :
-                    T.green;
+                  const ticketLabel = isApproved && !c.acknowledgement
+                    ? "SENT TO IT"
+                    : c.status === "cancel" || c.action === "cancel" ? "CANCELLED"
+                    : c.status === "not done" ? "NOT DONE"
+                    : "CLOSED";
+
+                  const ticketColor = isApproved && !c.acknowledgement
+                    ? T.teal
+                    : c.status === "cancel" || c.action === "cancel" ? T.red
+                    : c.status === "not done" ? T.amber
+                    : T.green;
 
                   return (
                     <tr key={c._id} className="ops-row"

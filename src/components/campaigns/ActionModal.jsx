@@ -1,9 +1,9 @@
 /**
  * ActionModal — PM approves or cancels a campaign.
- * Extracted from PMDashboard where it was defined inline (~120 lines).
  *
- * FIX: Initial scheduleAt now defaults to campaign's requestedAt instead of
- * current time. PM can still change it manually before confirming.
+ * FIX (req 4): scheduleAt now defaults to the campaign's existing scheduleAt
+ * (if PM has previously set one), falling back to requestedAt, then now.
+ * This preserves the PM's previously chosen schedule time across re-opens.
  */
 import { useState, useEffect } from "react";
 import { T, inputSx } from "../../constants/theme.js";
@@ -13,9 +13,11 @@ import { fmt, toLocalISO } from "../../utils/formatters.js";
 export default function ActionModal({ campaign, onClose, onSave }) {
   const [action,     setAction]     = useState("approve");
   const [pmMessage,  setPmMessage]  = useState("");
-  // FIX: default scheduleAt to campaign's requestedAt; falls back to now if absent
+  // Req 4: prefer existing scheduleAt (PM previously set), then requestedAt, then now
   const [scheduleAt, setScheduleAt] = useState(
-    toLocalISO(campaign?.requestedAt) || toLocalISO(new Date())
+    toLocalISO(campaign?.scheduleAt) ||
+    toLocalISO(campaign?.requestedAt) ||
+    toLocalISO(new Date())
   );
   const [busy,       setBusy]       = useState(false);
   const [err,        setErr]        = useState("");
@@ -154,7 +156,7 @@ export default function ActionModal({ campaign, onClose, onSave }) {
           </Field>
 
           {action === "approve" && (
-            <Field label="SCHEDULE AT" hint="pre-filled from requested time — change if needed">
+            <Field label="SCHEDULE AT" hint="defaults to requested time — change if needed">
               <input
                 type="datetime-local"
                 className="ops-focus"
