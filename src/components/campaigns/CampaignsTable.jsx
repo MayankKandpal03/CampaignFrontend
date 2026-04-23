@@ -1,5 +1,5 @@
 // src/components/campaigns/CampaignsTable.jsx — premium redesign
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { T, inputSx }        from "../../constants/theme.js";
 import { PM_FILTER_CARDS }   from "../../constants/filterCards.js";
 import { STATUS_META, ACTION_META } from "../../constants/statusMeta.js";
@@ -18,6 +18,15 @@ export default function CampaignsTable({
 }) {
   const [search,setSearch]=useState("");
   const [statusFilter,setStatusFilter]=useState(null);
+
+  // ── Time heartbeat to auto-update schedules without refresh ──────────────
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    // Check the clock every 10 seconds to see if any scheduleAt times have passed
+    const interval = setInterval(() => setNow(Date.now()), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Stats (added "not done") ───────────────────────────────────────────────
   const stats=useMemo(()=>({
@@ -117,14 +126,17 @@ export default function CampaignsTable({
                 {filtered.map((c,i)=>{
                   const creatorName=typeof c.createdBy==="object"?c.createdBy?.username:null;
                   const isApproved=c.action==="approve";
-                  const isClosed=c.status==="cancel"||c.status==="done"||c.status==="not done"||c.action==="cancel"||Boolean(c.acknowledgement);
-                  const canAct=!isApproved&&!isClosed&&showActionBtn;
-                  const ticketLabel=isApproved&&!c.acknowledgement?"Sent to IT"
-                    :c.status==="cancel"||c.action==="cancel"?"Cancelled"
-                    :c.status==="not done"?"Not Done":"Closed";
-                  const ticketColor=isApproved&&!c.acknowledgement?T.teal
-                    :c.status==="cancel"||c.action==="cancel"?T.red
-                    :c.status==="not done"?T.amber:T.green;
+                  const isFutureScheduled = c.scheduleAt && new Date(c.scheduleAt).getTime() > now;
+                  const isClosed = c.status==="cancel"||c.status==="done"||c.status==="not done"||c.action==="cancel"||Boolean(c.acknowledgement) || (isApproved && !isFutureScheduled);
+                  const canAct = !isClosed || (isApproved && isFutureScheduled);
+                  const ticketLabel = isApproved && isFutureScheduled ? "Scheduled"
+                    : isApproved && !c.acknowledgement ? "Sent to IT"
+                    : c.status==="cancel"||c.action==="cancel" ? "Cancelled"
+                    : c.status==="not done" ? "Not Done" : "Closed";
+                  const ticketColor = isApproved && isFutureScheduled ? T.purple
+                    : isApproved && !c.acknowledgement ? T.teal
+                    : c.status==="cancel"||c.action==="cancel" ? T.red
+                    : c.status==="not done" ? T.amber : T.green;
 
                   return(
                     <tr key={c._id} className="ops-row"
@@ -179,10 +191,17 @@ export default function CampaignsTable({
 
                       <td style={{padding:"12px 16px",whiteSpace:"nowrap"}}>
                         {canAct?(
-                          <button className="ops-upd" onClick={()=>onAction(c)}
-                            style={{padding:"4px 12px",borderRadius:99,background:T.amberBg,border:`1px solid ${T.amber}44`,color:T.amber,fontSize:9,fontWeight:700,letterSpacing:"0.1em",cursor:"pointer",fontFamily:"'Cinzel',serif",textTransform:"uppercase"}}>
-                            Update
-                          </button>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                            <button className="ops-upd" onClick={()=>onAction(c)}
+                              style={{padding:"4px 12px",borderRadius:99,background:T.amberBg,border:`1px solid ${T.amber}44`,color:T.amber,fontSize:9,fontWeight:700,letterSpacing:"0.1em",cursor:"pointer",fontFamily:"'Cinzel',serif",textTransform:"uppercase"}}>
+                              Update
+                            </button>
+                            {isApproved && isFutureScheduled && (
+                              <span style={{ fontSize: 8, color: T.purple, fontWeight: 600, letterSpacing: "0.05em", fontFamily: "'DM Sans',sans-serif" }}>
+                                AWAITING SCHEDULE
+                              </span>
+                            )}
+                          </div>
                         ):(
                           <span style={{display:"inline-flex",alignItems:"center",gap:4,fontSize:9,letterSpacing:"0.1em",fontWeight:700,color:ticketColor,fontFamily:"'Cinzel',serif",textTransform:"uppercase"}}>
                             <span style={{width:4,height:4,borderRadius:"50%",background:ticketColor,flexShrink:0}}/>
