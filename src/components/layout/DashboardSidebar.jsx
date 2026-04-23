@@ -1,25 +1,7 @@
 /**
- * DashboardSidebar — shared sidebar shell for all OPS SUITE dashboards.
- *
- * EXTRACTED FROM: PPCDashboard, ManagerDashboard, PMDashboard.
- * Each had an identical ~80-line <aside> block with only three differences:
- *   1. brandSub label ("PPC PANEL" / "MANAGER PANEL" / "PM PANEL")
- *   2. navItems array (different section IDs and labels)
- *   3. Optional extra slot (Manager team chip)
- *
- * All three differences are now props.
- *
- * @prop {string}     brandSub      - subtitle below "OPS SUITE"
- * @prop {Array}      navItems      - [{ id, label, count? }]
- * @prop {string}     activeSection - currently active nav item id
- * @prop {Function}   onNavigate    - called with section id on nav click
- * @prop {string}     user          - logged-in username (for avatar initials + display)
- * @prop {string}     role          - role label shown under username
- * @prop {Function}   onLogout      - sign-out handler
- * @prop {boolean}    isMobile      - controls fixed vs sticky positioning
- * @prop {boolean}    open          - mobile drawer open state
- * @prop {ReactNode=} extra         - optional slot rendered between brand and nav
- *                                   (used by ManagerDashboard for the team chip)
+ * DashboardSidebar — premium redesign.
+ * Props interface and all logic unchanged.
+ * Styling: refined navigation, elevated brand mark, polished account section.
  */
 import { T } from "../../constants/theme.js";
 import { initials } from "../../utils/formatters.js";
@@ -40,13 +22,12 @@ export default function DashboardSidebar({
   return (
     <aside
       style={{
-        width:        T.sideW,
-        minWidth:     T.sideW,
-        background:   T.bgSide,
-        borderRight:  `1px solid ${T.goldBorder}`,
-        display:      "flex",
-        flexDirection:"column",
-        /* ── responsive: slide-over on mobile, sticky on desktop ── */
+        width:         T.sideW,
+        minWidth:      T.sideW,
+        background:    `linear-gradient(180deg, ${T.bgSide} 0%, ${T.bg} 100%)`,
+        borderRight:   `1px solid ${T.subtle}`,
+        display:       "flex",
+        flexDirection: "column",
         ...(isMobile
           ? {
               position:   "fixed",
@@ -55,26 +36,39 @@ export default function DashboardSidebar({
               height:     "100vh",
               zIndex:     8000,
               overflowY:  "auto",
-              transition: "left .28s cubic-bezier(.22,1,.36,1)",
-              boxShadow:  open ? "8px 0 48px rgba(0,0,0,.9)" : "none",
+              transition: "left .3s cubic-bezier(.22,1,.36,1)",
+              boxShadow:  open ? "16px 0 60px rgba(0,0,0,.85)" : "none",
             }
           : {
-              position:   "sticky",
-              top:        0,
-              height:     "100vh",
-              overflowY:  "auto",
+              position:  "sticky",
+              top:       0,
+              height:    "100vh",
+              overflowY: "auto",
             }),
       }}
     >
-      {/* ── Brand ─────────────────────────────────────────────────── */}
+      {/* ── Brand ─────────────────────────────────────────────────────────── */}
       <div style={{
-        padding:      "22px 18px 20px",
-        borderBottom: `1px solid ${T.goldBorder}`,
-        display:      "flex",
-        alignItems:   "center",
-        gap:          12,
+        padding:     "20px 18px 18px",
+        borderBottom:`1px solid ${T.subtle}`,
+        display:     "flex",
+        alignItems:  "center",
+        gap:         11,
+        flexShrink:  0,
       }}>
-        <DiamondLogo size={32} />
+        <div style={{
+          width:          36,
+          height:         36,
+          borderRadius:   9,
+          background:     T.goldDim,
+          border:         `1px solid ${T.goldBorder}`,
+          display:        "flex",
+          alignItems:     "center",
+          justifyContent: "center",
+          flexShrink:     0,
+        }}>
+          <DiamondLogo size={20} />
+        </div>
         <div>
           <p style={{
             margin:        0,
@@ -83,33 +77,38 @@ export default function DashboardSidebar({
             color:         T.white,
             fontFamily:    "'Cinzel', serif",
             letterSpacing: "0.1em",
+            lineHeight:    1,
           }}>
             OPS SUITE
           </p>
           <p style={{
-            margin:        "2px 0 0",
+            margin:        "4px 0 0",
             fontSize:      8,
             color:         T.muted,
-            letterSpacing: "0.2em",
+            letterSpacing: "0.22em",
+            lineHeight:    1,
+            textTransform: "uppercase",
           }}>
             {brandSub}
           </p>
         </div>
       </div>
 
-      {/* ── Optional extra slot (e.g. Manager team chip) ──────────── */}
+      {/* ── Optional extra slot ────────────────────────────────────────────── */}
       {extra}
 
-      {/* ── Navigation ────────────────────────────────────────────── */}
-      <div style={{ padding: "18px 10px 10px", flex: 1 }}>
+      {/* ── Navigation ────────────────────────────────────────────────────── */}
+      <div style={{padding:"16px 10px 10px", flex:1}}>
         <p style={{
-          margin:        "0 0 10px 10px",
+          margin:        "0 0 8px 10px",
           fontSize:      8,
           color:         T.muted,
-          letterSpacing: "0.2em",
+          letterSpacing: "0.22em",
           fontFamily:    "'Cinzel', serif",
+          textTransform: "uppercase",
+          opacity:       0.7,
         }}>
-          NAVIGATION ·
+          Navigation
         </p>
 
         {navItems.map(item => {
@@ -120,47 +119,52 @@ export default function DashboardSidebar({
               className="ops-nav-btn"
               onClick={() => onNavigate(item.id)}
               style={{
-                display:    "flex",
-                alignItems: "center",
-                gap:        10,
-                width:      "100%",
-                padding:    "10px 12px 10px 10px",
-                borderRadius: 3,
-                background: active ? T.goldDim : "transparent",
-                border:     "none",
-                color:      active ? T.gold : T.muted,
-                fontSize:   13,
-                fontWeight: active ? 500 : 400,
-                cursor:     "pointer",
+                display:      "flex",
+                alignItems:   "center",
+                gap:          10,
+                width:        "100%",
+                padding:      "9px 12px 9px 10px",
+                borderRadius: 7,
+                background:   active ? T.goldDim : "transparent",
+                border:       "none",
+                color:        active ? T.gold : T.muted,
+                fontSize:     13,
+                fontWeight:   active ? 500 : 400,
+                cursor:       "pointer",
                 marginBottom: 2,
-                fontFamily: "'DM Sans', sans-serif",
-                textAlign:  "left",
-                transition: "all .15s",
+                fontFamily:   "'DM Sans', sans-serif",
+                textAlign:    "left",
+                position:     "relative",
+                overflow:     "hidden",
+                transition:   "all .16s ease",
+                boxShadow:    active ? `inset 2px 0 0 ${T.gold}` : "none",
               }}
             >
-              {/* Active indicator dot */}
+              {/* Active pip */}
               <span style={{
-                width:      6,
-                height:     6,
-                borderRadius:"50%",
-                flexShrink: 0,
-                background: active ? T.gold : T.subtle,
-                transition: "background .15s",
-              }} />
+                width:        5,
+                height:       5,
+                borderRadius: "50%",
+                flexShrink:   0,
+                background:   active ? T.gold : "transparent",
+                border:       `1px solid ${active ? T.gold : T.subtle}`,
+                transition:   "all .16s ease",
+              }}/>
 
-              <span style={{ flex: 1 }}>{item.label}</span>
+              <span style={{flex:1, lineHeight:1.2}}>{item.label}</span>
 
-              {/* Count badge — only rendered when count > 0 */}
+              {/* Count badge */}
               {item.count > 0 && (
                 <span style={{
-                  padding:    "1px 7px",
+                  padding:      "2px 7px",
                   borderRadius: 99,
-                  background: active ? T.gold   : T.subtle,
-                  color:      active ? "#0c0b08": T.muted,
-                  fontSize:   9,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontWeight: 700,
-                  transition: "all .15s",
+                  background:   active ? T.gold        : T.subtle,
+                  color:        active ? "#0c0906"     : T.muted,
+                  fontSize:     9,
+                  fontFamily:   "'JetBrains Mono', monospace",
+                  fontWeight:   700,
+                  transition:   "all .16s ease",
+                  lineHeight:   1.4,
                 }}>
                   {item.count}
                 </span>
@@ -170,39 +174,45 @@ export default function DashboardSidebar({
         })}
       </div>
 
-      {/* ── Account / Sign-out ────────────────────────────────────── */}
+      {/* ── Account / Sign-out ─────────────────────────────────────────────── */}
       <div style={{
-        padding:     "14px 16px 20px",
-        borderTop:   `1px solid ${T.goldBorder}`,
+        padding:    "14px 14px 18px",
+        borderTop:  `1px solid ${T.subtle}`,
+        flexShrink: 0,
       }}>
         <p style={{
-          margin:        "0 0 10px",
+          margin:        "0 0 10px 2px",
           fontSize:      8,
-          letterSpacing: "0.2em",
+          letterSpacing: "0.22em",
           color:         T.muted,
           fontFamily:    "'Cinzel', serif",
+          textTransform: "uppercase",
+          opacity:       0.7,
         }}>
-          — ACCOUNT
+          Account
         </p>
 
-        {/* User info row */}
+        {/* User info */}
         <div style={{
-          display:     "flex",
-          alignItems:  "center",
-          gap:         10,
+          display:      "flex",
+          alignItems:   "center",
+          gap:          10,
           marginBottom: 12,
+          padding:      "8px 10px",
+          borderRadius: 8,
+          background:   T.goldDim,
+          border:       `1px solid ${T.goldBorder}`,
         }}>
-          {/* Avatar */}
           <div style={{
-            width:          32,
-            height:         32,
+            width:          30,
+            height:         30,
             borderRadius:   "50%",
-            background:     T.goldDim,
+            background:     `linear-gradient(135deg, ${T.goldDim}, rgba(200,168,74,0.2))`,
             border:         `1px solid ${T.goldBorder}`,
             display:        "flex",
             alignItems:     "center",
             justifyContent: "center",
-            fontSize:       12,
+            fontSize:       11,
             fontWeight:     700,
             color:          T.gold,
             fontFamily:     "'Cinzel', serif",
@@ -210,18 +220,16 @@ export default function DashboardSidebar({
           }}>
             {initials(user || "U")}
           </div>
-
-          {/* Name + role */}
-          <div>
+          <div style={{overflow:"hidden", flex:1}}>
             <p style={{
               margin:       0,
-              fontSize:     13,
+              fontSize:     12,
               fontWeight:   500,
               color:        T.white,
               overflow:     "hidden",
               textOverflow: "ellipsis",
               whiteSpace:   "nowrap",
-              maxWidth:     128,
+              fontFamily:   "'DM Sans', sans-serif",
             }}>
               {user || "User"}
             </p>
@@ -230,38 +238,50 @@ export default function DashboardSidebar({
               fontSize:      8,
               color:         T.muted,
               letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              marginTop:     2,
             }}>
-              {(role || "").toUpperCase()} · ACTIVE
+              {(role || "").toUpperCase()}
             </p>
           </div>
         </div>
 
-        {/* Sign-out button */}
+        {/* Sign-out */}
         <button
           onClick={onLogout}
           style={{
             width:         "100%",
             padding:       "8px",
-            borderRadius:  3,
+            borderRadius:  7,
             cursor:        "pointer",
             background:    "transparent",
             border:        `1px solid ${T.subtle}`,
             color:         T.muted,
             fontSize:      10,
-            letterSpacing: "0.12em",
+            letterSpacing: "0.14em",
             fontFamily:    "'Cinzel', serif",
-            transition:    "all .15s",
+            textTransform: "uppercase",
+            transition:    "all .18s ease",
+            display:       "flex",
+            alignItems:    "center",
+            justifyContent:"center",
+            gap:           7,
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = T.red;
-            e.currentTarget.style.color       = T.red;
+            e.currentTarget.style.borderColor  = T.red;
+            e.currentTarget.style.color        = T.red;
+            e.currentTarget.style.background   = T.redBg;
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = T.subtle;
-            e.currentTarget.style.color       = T.muted;
+            e.currentTarget.style.borderColor  = T.subtle;
+            e.currentTarget.style.color        = T.muted;
+            e.currentTarget.style.background   = "transparent";
           }}
         >
-          SIGN OUT
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
+          </svg>
+          Sign Out
         </button>
       </div>
     </aside>

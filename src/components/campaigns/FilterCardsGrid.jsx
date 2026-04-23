@@ -1,20 +1,6 @@
 /**
- * FilterCardsGrid — clickable status filter cards row.
- *
- * EXTRACTED FROM: PPCDashboard and ManagerDashboard.
- * Both pages rendered the same filter card grid inline (~30 lines each)
- * with the same click-to-toggle behaviour and identical card structure.
- *
- * PPCDashboard also had a mobile-only show/hide toggle above the grid;
- * that toggle is controlled from the page via the `visible` prop.
- *
- * @prop {Array}    cards         - array of { id, label, color, bg }
- * @prop {object}   stats         - map of id → count
- * @prop {string|null} activeId   - currently selected filter id (or null)
- * @prop {Function} onSelect      - called with card id when a card is clicked;
- *                                  returns null when same card clicked again (toggle)
- * @prop {boolean=} isMobile      - enables horizontal scroll + fixed card width
- * @prop {boolean=} visible       - whether to render (used for mobile show/hide)
+ * FilterCardsGrid — premium filterable status cards.
+ * Props and logic unchanged.
  */
 import { T } from "../../constants/theme.js";
 
@@ -29,17 +15,15 @@ export default function FilterCardsGrid({
   if (!visible) return null;
 
   return (
-    <div
-      style={{
-        display:       "flex",
-        gap:           10,
-        overflowX:     isMobile ? "auto" : "unset",
-        flexWrap:      isMobile ? "nowrap" : "wrap",
-        marginBottom:  22,
-        paddingBottom: isMobile ? 4 : 0,
-        animation:     "opsFadeUp .22s ease",
-      }}
-    >
+    <div style={{
+      display:       "flex",
+      gap:           10,
+      overflowX:     isMobile ? "auto" : "unset",
+      flexWrap:      isMobile ? "nowrap" : "wrap",
+      marginBottom:  22,
+      paddingBottom: isMobile ? 6 : 0,
+      animation:     "opsFadeUp .25s ease",
+    }}>
       {cards.map(card => {
         const active = activeId === card.id;
         const count  = stats[card.id] ?? 0;
@@ -50,62 +34,83 @@ export default function FilterCardsGrid({
             className="ops-fcard"
             onClick={() => onSelect(card.id)}
             style={{
-              flex:       isMobile ? "0 0 130px" : "1 1 0",
-              minWidth:   isMobile ? 130 : 110,
-              padding:    "16px 16px 14px",
-              borderRadius: 4,
-              background: active ? card.bg    : T.bgCard,
-              border:     `1px solid ${active ? card.color : T.goldBorder}`,
-              cursor:     "pointer",
-              userSelect: "none",
+              flex:         isMobile ? "0 0 136px" : "1 1 0",
+              minWidth:     isMobile ? 136 : 110,
+              padding:      "16px 18px 14px",
+              borderRadius: 10,
+              background:   active
+                ? `linear-gradient(135deg, ${card.bg}, rgba(${hexToRgbStr(card.color)}, 0.12))`
+                : T.bgCard,
+              border:       `1px solid ${active ? card.color + "55" : T.subtle}`,
+              cursor:       "pointer",
+              userSelect:   "none",
+              boxShadow:    active
+                ? `0 4px 20px rgba(${hexToRgbStr(card.color)}, 0.12), 0 1px 4px rgba(0,0,0,0.3)`
+                : T.shadowSm,
             }}
           >
-            {/* Label row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+            {/* Label */}
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:11 }}>
               <span style={{
-                width:      6,
-                height:     6,
+                width:        5,
+                height:       5,
                 borderRadius: "50%",
-                background: card.color,
-                flexShrink: 0,
-              }} />
+                background:   active ? card.color : T.muted,
+                flexShrink:   0,
+                boxShadow:    active ? `0 0 6px ${card.color}` : "none",
+                transition:   "all .18s",
+              }}/>
               <span style={{
-                fontSize:      8,
+                fontSize:      8.5,
                 fontWeight:    700,
-                letterSpacing: "0.18em",
+                letterSpacing: "0.16em",
                 color:         active ? card.color : T.muted,
                 fontFamily:    "'Cinzel', serif",
+                textTransform: "uppercase",
                 transition:    "color .18s",
               }}>
-                {card.label.toUpperCase()}
+                {card.label}
               </span>
             </div>
 
             {/* Count */}
             <div style={{
-              fontSize:   30,
-              fontWeight: 700,
-              color:      active ? card.color : T.white,
-              fontFamily: "'Cinzel', serif",
-              lineHeight: 1,
+              fontSize:      28,
+              fontWeight:    700,
+              color:         active ? card.color : T.white,
+              fontFamily:    "'Cinzel', serif",
+              lineHeight:    1,
+              letterSpacing: "-0.01em",
+              transition:    "color .18s",
             }}>
               {count}
             </div>
 
-            <div style={{ fontSize: 9, color: T.muted, marginTop: 5 }}>
+            <div style={{
+              fontSize:   9,
+              color:      active ? card.color + "99" : T.muted,
+              marginTop:  5,
+              fontFamily: "'DM Sans', sans-serif",
+              transition: "color .18s",
+            }}>
               campaigns
             </div>
 
-            {/* Active indicator */}
             {active && (
               <div style={{
-                marginTop:     8,
+                marginTop:     9,
+                paddingTop:    9,
+                borderTop:     `1px solid ${card.color}25`,
                 fontSize:      8,
                 color:         card.color,
-                letterSpacing: "0.1em",
+                letterSpacing: "0.12em",
                 fontFamily:    "'Cinzel', serif",
+                display:       "flex",
+                alignItems:    "center",
+                gap:           5,
               }}>
-                ● FILTERING
+                <span style={{ width:4, height:4, borderRadius:"50%", background:card.color, animation:"opsPulse 1.8s ease infinite" }}/>
+                Filtering
               </div>
             )}
           </div>
@@ -113,4 +118,16 @@ export default function FilterCardsGrid({
       })}
     </div>
   );
+}
+
+/** Rough hex→rgb for box-shadow rgba — handles 3 and 6-char hex */
+function hexToRgbStr(hex = "#888") {
+  const h = hex.replace("#","");
+  const full = h.length === 3
+    ? h.split("").map(c => c+c).join("")
+    : h;
+  const r = parseInt(full.slice(0,2),16);
+  const g = parseInt(full.slice(2,4),16);
+  const b = parseInt(full.slice(4,6),16);
+  return `${r},${g},${b}`;
 }

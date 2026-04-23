@@ -1,52 +1,130 @@
 /**
- * OpsGlobalStyles — injects the shared keyframe animations and utility
- * class overrides used by all three OPS SUITE dashboards (PPC, Manager, PM).
- *
- * Previously each dashboard injected identical CSS via a `<style>` tag
- * embedded in the JSX. Extracting into one component prevents duplicate
- * style injection when multiple dashboard tabs are open in the same SPA session.
- *
- * Place this once at the root of each dashboard or in App.jsx.
+ * OpsGlobalStyles — premium animation system and shared utility classes.
+ * Injects keyframes, refined hover states, and smooth interactions.
  */
 import { T } from "../../constants/theme.js";
 
 export default function OpsGlobalStyles() {
   return (
     <style>{`
-      @keyframes opsIn      { from { opacity:0; transform:translateY(14px) scale(.97); } to { opacity:1; transform:none; } }
-      @keyframes opsFadeUp  { from { opacity:0; transform:translateY(8px); }            to { opacity:1; transform:none; } }
-      @keyframes opsPulse   { 0%,100%{opacity:.6} 50%{opacity:1} }
+      /* ── Font rendering ─────────────────────────────────────────────────── */
+      * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
-      .ops-focus:focus     { border-color:${T.gold} !important; box-shadow:0 0 0 3px ${T.goldDim}; outline:none; }
+      /* ── Keyframes ──────────────────────────────────────────────────────── */
+      @keyframes opsIn {
+        from { opacity:0; transform:translateY(16px) scale(.975); }
+        to   { opacity:1; transform:translateY(0)    scale(1); }
+      }
+      @keyframes opsFadeUp {
+        from { opacity:0; transform:translateY(10px); }
+        to   { opacity:1; transform:none; }
+      }
+      @keyframes opsFadeIn {
+        from { opacity:0; }
+        to   { opacity:1; }
+      }
+      @keyframes opsPulse {
+        0%, 100% { opacity:.5; }
+        50%       { opacity:1; }
+      }
+      @keyframes opsSlideIn {
+        from { opacity:0; transform:translateX(-8px); }
+        to   { opacity:1; transform:none; }
+      }
+      @keyframes opsSpinner {
+        to { transform:rotate(360deg); }
+      }
+      @keyframes opsGlow {
+        0%,100% { box-shadow: 0 0 0 0 rgba(200,168,74,0); }
+        50%      { box-shadow: 0 0 12px 3px rgba(200,168,74,0.15); }
+      }
 
-      .ops-row             { cursor:default; transition:background .12s, box-shadow .12s; }
-      .ops-row:hover       { background:${T.bgRow} !important; box-shadow:inset 3px 0 0 ${T.gold}55; }
-      .ops-row:hover td:first-child { color:${T.gold}; }
+      /* ── Focus states ───────────────────────────────────────────────────── */
+      .ops-focus:focus {
+        border-color: ${T.gold} !important;
+        box-shadow: 0 0 0 3px ${T.goldDim}, 0 1px 2px rgba(0,0,0,0.3) !important;
+        outline: none;
+        background: ${T.bgInput} !important;
+      }
+      button:focus-visible {
+        outline: 2px solid ${T.gold};
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
 
-      .ops-nav-btn         { transition:all .15s !important; }
-      .ops-nav-btn:hover   { color:${T.gold} !important; background:${T.goldDim} !important; }
-      .ops-nav-btn:active  { transform:scale(.97) !important; }
+      /* ── Table rows ─────────────────────────────────────────────────────── */
+      .ops-row {
+        cursor: default;
+        transition: background 0.14s ease, box-shadow 0.14s ease;
+        position: relative;
+      }
+      .ops-row:hover {
+        background: rgba(200,168,74,0.03) !important;
+        box-shadow: inset 3px 0 0 rgba(200,168,74,0.4) !important;
+      }
+      .ops-row:hover td:first-child { color: ${T.gold}; }
 
-      .ops-fcard           { transition:transform .18s, border-color .18s, box-shadow .18s; cursor:pointer; }
-      .ops-fcard:hover     { transform:translateY(-3px); box-shadow:0 6px 24px rgba(0,0,0,.5); }
-      .ops-fcard:active    { transform:translateY(-1px) scale(.98); }
+      /* ── Nav buttons ────────────────────────────────────────────────────── */
+      .ops-nav-btn {
+        transition: color 0.15s ease, background 0.15s ease !important;
+      }
+      .ops-nav-btn:hover {
+        color:       ${T.gold}    !important;
+        background:  ${T.goldDim} !important;
+      }
+      .ops-nav-btn:active { transform: scale(.97) !important; }
 
-      .ops-upd             { transition:all .15s !important; }
-      .ops-upd:hover       { background:rgba(240,160,48,.22) !important; border-color:${T.amber} !important; transform:scale(1.05); }
-      .ops-upd:active      { transform:scale(.97) !important; }
+      /* ── Filter cards ───────────────────────────────────────────────────── */
+      .ops-fcard {
+        transition: transform 0.2s cubic-bezier(.22,1,.36,1), border-color 0.18s ease, box-shadow 0.2s ease;
+        cursor: pointer;
+      }
+      .ops-fcard:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+      }
+      .ops-fcard:active { transform: translateY(-1px) scale(.99); }
 
-      .ops-del             { transition:all .15s !important; }
-      .ops-del:hover       { background:rgba(224,82,82,.22) !important; border-color:${T.red} !important; color:${T.red} !important; }
+      /* ── Update/action row buttons ──────────────────────────────────────── */
+      .ops-upd { transition: all 0.15s ease !important; }
+      .ops-upd:hover {
+        background: rgba(240,160,36,.18) !important;
+        border-color: ${T.amber} !important;
+        transform: scale(1.04);
+      }
+      .ops-upd:active { transform: scale(.97) !important; }
 
-      .ops-pending         { animation:opsPulse 2.4s ease-in-out infinite; }
+      .ops-del { transition: all 0.15s ease !important; }
+      .ops-del:hover {
+        background: rgba(220,82,82,.18) !important;
+        border-color: ${T.red}  !important;
+        color: ${T.red}          !important;
+      }
 
-      button:focus-visible { outline:2px solid ${T.gold}; outline-offset:2px; }
+      /* ── Pending badge pulse ────────────────────────────────────────────── */
+      .ops-pending { animation: opsPulse 2.6s ease-in-out infinite; }
 
-      ::-webkit-scrollbar         { width:4px; height:4px; }
-      ::-webkit-scrollbar-thumb   { background:${T.subtle}; border-radius:99px; }
-      ::-webkit-scrollbar-track   { background:transparent; }
+      /* ── Scrollbar ──────────────────────────────────────────────────────── */
+      ::-webkit-scrollbar         { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-thumb   {
+        background:    rgba(200,168,74,0.2);
+        border-radius: 99px;
+        transition:    background 0.2s;
+      }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(200,168,74,0.4); }
+      ::-webkit-scrollbar-track  { background: transparent; }
 
-      select option { background:${T.bgCard}; color:${T.text}; }
+      /* ── Select options ─────────────────────────────────────────────────── */
+      select option { background: ${T.bgCard}; color: ${T.text}; }
+
+      /* ── Smooth scrolling ───────────────────────────────────────────────── */
+      html { scroll-behavior: smooth; }
+
+      /* ── Modal overlay backdrop ─────────────────────────────────────────── */
+      .ops-modal-overlay {
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+      }
     `}</style>
   );
 }

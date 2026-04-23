@@ -2,7 +2,9 @@ import axios from "axios";
 
 // Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api/v1",
+  baseURL:
+    import.meta.env.VITE_API_BASE_URL ||
+    "https://campaignbackend-production.up.railway.app/api/v1",
   timeout: 10000, // Maximum time for a request after this axios will throw timeout error
   withCredentials: true,
   headers: {
@@ -23,9 +25,9 @@ api.interceptors.request.use(
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
-// Here 
+// Here
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -46,7 +48,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

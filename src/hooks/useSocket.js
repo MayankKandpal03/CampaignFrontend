@@ -40,7 +40,7 @@ export const useSocket = (eventHandlers = {}) => {
     if (Object.keys(handlersRef.current).length === 0) return;
 
     const socket = io(
-      import.meta.env.VITE_SOCKET_URL || "http://localhost:3000",
+      import.meta.env.VITE_SOCKET_URL || "https://campaignsatkartar.up.railway.app",
       { withCredentials: true }
     );
 

@@ -1,42 +1,40 @@
 /**
  * UpdateModal — PPC / Manager campaign edit + cancel modal.
  *
- * EXTRACTED FROM: PPCDashboard and ManagerDashboard.
- * Both contained a near-identical ~130-line UpdateModal component defined locally.
- * The only difference was cosmetic label text ("EDIT" vs "TRANSFER") — now unified.
+ * TIMEZONE FIX:
+ * requestedAt from the datetime-local input is local time. We convert to UTC
+ * ISO via localToUTC() before sending to the server.
  *
- * Responsibilities:
- *  - Toggle between "transfer" (edit) and "cancel" actions
- *  - Validate required message field before submitting
- *  - Call onSave(campaignId, { message, status, requestedAt })
- *  - Close on Escape key or overlay click
+ * RESET BEHAVIOUR (requirement):
+ * When a PPC/Manager edits an approved campaign (before its scheduleAt), the
+ * backend resets scheduleAt, pmMessage and action automatically. The frontend
+ * just sends the normal update; the server handles the reset.
  */
 import { useState, useEffect } from "react";
 import { T, inputSx } from "../../constants/theme.js";
-import { toLocalISO } from "../../utils/formatters.js";
+import { toLocalISO, localToUTC } from "../../utils/formatters.js";
 import Field from "../common/Field.jsx";
 
 export default function UpdateModal({ campaign, onClose, onSave }) {
-  const [status,      setStatus]      = useState("transfer");
-  const [message,     setMessage]     = useState(campaign?.message || "");
-  // FIX: use toLocalISO so the campaign's existing requestedAt is shown correctly
-  // instead of falling back to empty (which browsers render as 12:00)
+  const [status, setStatus] = useState("transfer");
+  const [message, setMessage] = useState(campaign?.message || "");
   const [requestedAt, setRequestedAt] = useState(
-    toLocalISO(campaign?.requestedAt) || toLocalISO(new Date())
+    toLocalISO(campaign?.requestedAt) || toLocalISO(new Date()),
   );
   const [busy, setBusy] = useState(false);
-  const [err,  setErr]  = useState("");
+  const [err, setErr] = useState("");
 
-  /* Close on Escape */
   useEffect(() => {
-    const h = e => { if (e.key === "Escape") onClose(); };
+    const h = (e) => {
+      if (e.key === "Escape") onClose();
+    };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
 
   if (!campaign) return null;
 
-  const handleSubmit = async e => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (status === "transfer" && !message.trim()) {
       setErr("Message is required.");
@@ -46,9 +44,14 @@ export default function UpdateModal({ campaign, onClose, onSave }) {
     setBusy(true);
     try {
       await onSave(campaign._id, {
-        message:     status === "transfer" ? message.trim() : campaign.message,
+        message: status === "transfer" ? message.trim() : campaign.message,
         status,
-        requestedAt: status === "transfer" ? (requestedAt || undefined) : undefined,
+        /**
+         * FIX: Convert datetime-local → UTC ISO before sending.
+         * localToUTC("2024-01-15T14:30") in IST browser → "2024-01-15T09:00:00.000Z"
+         */
+        requestedAt:
+          status === "transfer" ? localToUTC(requestedAt) : undefined,
       });
       onClose();
     } catch (ex) {
@@ -58,166 +61,243 @@ export default function UpdateModal({ campaign, onClose, onSave }) {
     }
   };
 
-  /* ── Shared button base style ── */
-  const closeBtn = {
-    background: "transparent", border: `1px solid ${T.subtle}`,
-    color: T.muted, cursor: "pointer",
-    width: 28, height: 28, borderRadius: 2, fontSize: 13,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    transition: "all 0.15s",
-  };
-
   return (
     <div
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       style={{
-        position: "fixed", inset: 0, zIndex: 9000,
-        background: "rgba(0,0,0,0.80)",
-        display: "flex", alignItems: "center", justifyContent: "center",
+        position: "fixed",
+        inset: 0,
+        zIndex: 9000,
+        background: "rgba(0,0,0,0.75)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         padding: 16,
       }}
     >
-      <div style={{
-        background:   T.bgCard,
-        border:       `1px solid ${T.goldBorder}`,
-        borderRadius: 4,
-        padding:      "28px 26px 24px",
-        width:        "100%",
-        maxWidth:     460,
-        animation:    "opsIn 0.22s cubic-bezier(.22,1,.36,1)",
-      }}>
-
-        {/* ── Header ── */}
-        <div style={{
-          display:        "flex",
-          justifyContent: "space-between",
-          alignItems:     "flex-start",
-          marginBottom:   20,
-        }}>
+      <div
+        style={{
+          background: `linear-gradient(160deg, ${T.bgCard}, ${T.bg})`,
+          border: `1px solid ${T.subtle}`,
+          borderRadius: 14,
+          padding: "28px 28px 24px",
+          width: "100%",
+          maxWidth: 468,
+          boxShadow: `0 24px 64px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.5)`,
+          animation: "opsIn 0.24s cubic-bezier(.22,1,.36,1)",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 22,
+          }}
+        >
           <div>
-            <p style={{
-              margin: 0, fontSize: 8, letterSpacing: "0.22em",
-              color: T.gold, fontFamily: "'Cinzel', serif",
-            }}>
-              — UPDATE CAMPAIGN
+            <p
+              style={{
+                margin: 0,
+                fontSize: 8,
+                letterSpacing: "0.22em",
+                color: "rgba(200,168,74,0.6)",
+                fontFamily: "'Cinzel', serif",
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}
+            >
+              Update Campaign
             </p>
-            <h3 style={{
-              margin: "4px 0 0", fontSize: 17, fontWeight: 600,
-              color: T.white, fontFamily: "'Cinzel', serif",
-            }}>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 18,
+                fontWeight: 600,
+                color: T.white,
+                fontFamily: "'Cinzel', serif",
+                letterSpacing: "0.02em",
+              }}
+            >
               Edit Request
             </h3>
           </div>
           <button
             onClick={onClose}
-            style={closeBtn}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = T.red;
-              e.currentTarget.style.color       = T.red;
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 7,
+              background: "transparent",
+              border: `1px solid ${T.subtle}`,
+              color: T.muted,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.15s ease",
+              flexShrink: 0,
             }}
-            onMouseLeave={e => {
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = T.red;
+              e.currentTarget.style.color = T.red;
+              e.currentTarget.style.background = T.redBg;
+            }}
+            onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = T.subtle;
-              e.currentTarget.style.color       = T.muted;
+              e.currentTarget.style.color = T.muted;
+              e.currentTarget.style.background = "transparent";
             }}
           >
-            ✕
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
 
-        {/* ── Current message preview ── */}
-        <div style={{
-          padding:      "9px 12px",
-          background:   T.bgInput,
-          border:       `1px solid ${T.subtle}`,
-          borderRadius: 3,
-          marginBottom: 20,
-        }}>
-          <p style={{
-            margin: 0, fontSize: 9, letterSpacing: "0.12em",
-            color: T.muted, fontFamily: "'Cinzel', serif", marginBottom: 4,
-          }}>
-            CURRENT MESSAGE
+        {/* Current message preview */}
+        <div
+          style={{
+            padding: "10px 14px",
+            background: T.bgInput,
+            border: `1px solid ${T.subtle}`,
+            borderRadius: 8,
+            marginBottom: 20,
+          }}
+        >
+          <p
+            style={{
+              margin: "0 0 4px",
+              fontSize: 8,
+              letterSpacing: "0.14em",
+              color: T.muted,
+              fontFamily: "'Cinzel',serif",
+              textTransform: "uppercase",
+            }}
+          >
+            Current Message
           </p>
-          <p style={{ margin: 0, fontSize: 12, color: T.text, lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: 12, color: T.text, lineHeight: 1.6 }}>
             {campaign.message}
           </p>
         </div>
 
-        {/* ── Error banner ── */}
+        {/* Approved-but-not-yet-scheduled notice */}
+        {campaign.action === "approve" && (
+          <div
+            style={{
+              padding: "10px 14px",
+              background: T.amberBg,
+              border: `1px solid ${T.amber}44`,
+              borderRadius: 8,
+              marginBottom: 16,
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: T.amber,
+                lineHeight: 1.65,
+                fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              ⚠ This campaign was approved by the PM. Editing it will{" "}
+              <strong>reset the PM approval</strong> — the PM will need to
+              review and approve again.
+            </p>
+          </div>
+        )}
+
         {err && (
-          <div style={{
-            padding:      "9px 13px",
-            background:   T.redBg,
-            border:       `1px solid ${T.red}44`,
-            borderRadius: 3,
-            color:        T.red,
-            fontSize:     12,
-            marginBottom: 16,
-          }}>
+          <div
+            style={{
+              padding: "10px 14px",
+              background: T.redBg,
+              border: `1px solid ${T.red}44`,
+              borderRadius: 8,
+              color: T.red,
+              fontSize: 12,
+              marginBottom: 16,
+              lineHeight: 1.5,
+            }}
+          >
             {err}
           </div>
         )}
 
-        {/* ── Form ── */}
         <form onSubmit={handleSubmit}>
-
           {/* Action toggle */}
-          <Field label="ACTION">
+          <Field label="Action">
             <div style={{ display: "flex", gap: 10 }}>
               {[
-                { val: "transfer", label: "EDIT",   desc: "Update & keep active"  },
-                { val: "cancel",   label: "CANCEL",  desc: "Cancel this campaign" },
+                { val: "transfer", label: "Edit", desc: "Update & keep active" },
+                { val: "cancel", label: "Cancel", desc: "Cancel this campaign" },
               ].map(({ val, label, desc }) => {
                 const isActive = status === val;
                 const isCancel = val === "cancel";
+                const activeColor = isCancel ? T.red : T.gold;
+                const activeBg = isCancel ? T.redBg : T.goldDim;
                 return (
                   <button
                     key={val}
                     type="button"
                     onClick={() => setStatus(val)}
                     style={{
-                      flex:       1,
-                      padding:    "11px 10px",
-                      borderRadius: 3,
-                      cursor:     "pointer",
-                      background: isActive
-                        ? (isCancel ? T.redBg    : T.goldDim)
-                        : T.bgInput,
-                      border: `1px solid ${
-                        isActive ? (isCancel ? T.red : T.gold) : T.subtle
-                      }`,
-                      color: isActive
-                        ? (isCancel ? T.red : T.gold)
-                        : T.muted,
-                      transition: "all 0.15s",
+                      flex: 1,
+                      padding: "12px 10px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      background: isActive ? activeBg : T.bgInput,
+                      border: `1px solid ${isActive ? activeColor : T.subtle}`,
+                      color: isActive ? activeColor : T.muted,
+                      transition: "all 0.15s ease",
                     }}
-                    onMouseEnter={e => {
+                    onMouseEnter={(e) => {
                       if (!isActive) {
                         e.currentTarget.style.borderColor = T.goldBorder;
-                        e.currentTarget.style.color       = T.gold;
+                        e.currentTarget.style.color = T.gold;
                       }
                     }}
-                    onMouseLeave={e => {
+                    onMouseLeave={(e) => {
                       if (!isActive) {
                         e.currentTarget.style.borderColor = T.subtle;
-                        e.currentTarget.style.color       = T.muted;
+                        e.currentTarget.style.color = T.muted;
                       }
                     }}
                   >
-                    <div style={{
-                      fontSize:      10,
-                      fontWeight:    700,
-                      letterSpacing: "0.12em",
-                      fontFamily:    "'Cinzel', serif",
-                      marginBottom:  3,
-                    }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        letterSpacing: "0.12em",
+                        fontFamily: "'Cinzel',serif",
+                        textTransform: "uppercase",
+                        marginBottom: 3,
+                      }}
+                    >
                       {label}
                     </div>
-                    <div style={{
-                      fontSize:   10,
-                      opacity:    0.7,
-                      fontFamily: "'DM Sans', sans-serif",
-                    }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        opacity: 0.65,
+                        fontFamily: "'DM Sans',sans-serif",
+                      }}
+                    >
                       {desc}
                     </div>
                   </button>
@@ -226,51 +306,57 @@ export default function UpdateModal({ campaign, onClose, onSave }) {
             </div>
           </Field>
 
-          {/* Edit fields */}
           {status === "transfer" && (
             <>
-              <Field label="MESSAGE" hint="required">
+              <Field label="Message" hint="required">
                 <textarea
                   className="ops-focus"
                   value={message}
-                  onChange={e => setMessage(e.target.value)}
+                  onChange={(e) => setMessage(e.target.value)}
                   placeholder="Describe the campaign request…"
                   rows={3}
                   required
-                  style={{ ...inputSx, resize: "vertical", lineHeight: 1.6 }}
+                  style={{
+                    ...inputSx,
+                    borderRadius: 8,
+                    resize: "vertical",
+                    lineHeight: 1.6,
+                  }}
                 />
               </Field>
-
-              <Field label="REQUESTED DATE / TIME" hint="optional — pre-filled from existing value">
+              <Field label="Requested Date / Time" hint="optional">
                 <input
                   type="datetime-local"
                   className="ops-focus"
                   value={requestedAt}
-                  onChange={e => setRequestedAt(e.target.value)}
-                  style={{ ...inputSx, colorScheme: "dark" }}
+                  onChange={(e) => setRequestedAt(e.target.value)}
+                  style={{ ...inputSx, borderRadius: 8, colorScheme: "dark" }}
                 />
               </Field>
             </>
           )}
 
-          {/* Cancel warning */}
           {status === "cancel" && (
-            <div style={{
-              padding:      "11px 14px",
-              background:   T.redBg,
-              border:       `1px solid ${T.red}33`,
-              borderRadius: 3,
-              marginBottom: 18,
-            }}>
-              <p style={{
-                margin:     0,
-                fontSize:   12,
-                color:      "#f09090",
-                lineHeight: 1.6,
-                fontFamily: "'DM Sans', sans-serif",
-              }}>
+            <div
+              style={{
+                padding: "12px 14px",
+                background: T.redBg,
+                border: `1px solid ${T.red}30`,
+                borderRadius: 8,
+                marginBottom: 18,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 12,
+                  color: "#f09090",
+                  lineHeight: 1.65,
+                  fontFamily: "'DM Sans',sans-serif",
+                }}
+              >
                 ⚠ This will permanently{" "}
-                <strong style={{ color: T.red }}>CANCEL</strong> this campaign.
+                <strong style={{ color: T.red }}>cancel</strong> this campaign.
                 This action cannot be undone.
               </p>
             </div>
@@ -282,64 +368,63 @@ export default function UpdateModal({ campaign, onClose, onSave }) {
               type="button"
               onClick={onClose}
               style={{
-                flex:          1,
-                padding:       "11px",
-                borderRadius:  3,
-                cursor:        "pointer",
-                background:    "transparent",
-                border:        `1px solid ${T.subtle}`,
-                color:         T.muted,
-                fontSize:      11,
+                flex: 1,
+                padding: "11px",
+                borderRadius: 8,
+                cursor: "pointer",
+                background: "transparent",
+                border: `1px solid ${T.subtle}`,
+                color: T.muted,
+                fontSize: 11,
                 letterSpacing: "0.1em",
-                fontFamily:    "'Cinzel', serif",
-                transition:    "all 0.15s",
+                fontFamily: "'Cinzel',serif",
+                textTransform: "uppercase",
+                transition: "all 0.15s ease",
               }}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = T.goldBorder;
-                e.currentTarget.style.color       = T.gold;
+                e.currentTarget.style.color = T.gold;
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = T.subtle;
-                e.currentTarget.style.color       = T.muted;
+                e.currentTarget.style.color = T.muted;
               }}
             >
-              DISCARD
+              Discard
             </button>
 
             <button
               type="submit"
               disabled={busy}
               style={{
-                flex:          2,
-                padding:       "11px",
-                borderRadius:  3,
-                cursor:        busy ? "not-allowed" : "pointer",
-                opacity:       busy ? 0.6 : 1,
-                background:    status === "cancel" ? T.redBg  : T.gold,
-                border:        `1px solid ${status === "cancel" ? `${T.red}66` : T.gold}`,
-                color:         status === "cancel" ? T.red    : "#0c0b08",
-                fontSize:      11,
-                fontWeight:    700,
-                letterSpacing: "0.14em",
-                fontFamily:    "'Cinzel', serif",
-                transition:    "all 0.15s",
-              }}
-              onMouseEnter={e => {
-                if (!busy) {
-                  e.currentTarget.style.background = status === "cancel"
-                    ? "rgba(224,82,82,0.22)"
-                    : T.goldLight;
-                }
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = status === "cancel" ? T.redBg : T.gold;
+                flex: 2,
+                padding: "11px",
+                borderRadius: 8,
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.6 : 1,
+                background:
+                  status === "cancel"
+                    ? T.redBg
+                    : `linear-gradient(135deg, ${T.gold}, #d4b44e)`,
+                border: `1px solid ${status === "cancel" ? `${T.red}55` : T.gold}`,
+                color: status === "cancel" ? T.red : "#0c0906",
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.12em",
+                fontFamily: "'Cinzel',serif",
+                textTransform: "uppercase",
+                transition: "all 0.15s ease",
+                boxShadow:
+                  status !== "cancel"
+                    ? "0 2px 10px rgba(200,168,74,0.18)"
+                    : "none",
               }}
             >
               {busy
-                ? "SAVING…"
+                ? "Saving…"
                 : status === "cancel"
-                ? "CONFIRM CANCEL"
-                : "SAVE CHANGES"}
+                  ? "Confirm Cancel"
+                  : "Save Changes"}
             </button>
           </div>
         </form>

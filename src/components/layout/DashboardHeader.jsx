@@ -1,21 +1,7 @@
 /**
- * DashboardHeader — sticky top bar for all OPS SUITE dashboards.
- *
- * EXTRACTED FROM: PPCDashboard, ManagerDashboard, PMDashboard.
- * Each had an identical ~40-line <header> block with only the title
- * and subLabel as differences.
- *
- * The notification bell + NotifPanel dropdown are self-contained here
- * using the useNotifStore directly, so callers don't need to thread
- * unread counts or panel open-state through props.
- *
- * @prop {boolean}  isMobile      - show hamburger button when true
- * @prop {Function} onMenuToggle  - hamburger click handler
- * @prop {boolean}  sidebarOpen   - controls hamburger icon (☰ vs ✕)
- * @prop {string}   title         - main heading text
- * @prop {string=}  subLabel      - small eyebrow text above title
- * @prop {string=}  badge         - optional count badge next to bell
- *                                  (e.g. "3 Pending" in ITDashboard)
+ * DashboardHeader — premium redesign.
+ * Props and logic (NotifPanel, useNotifStore) unchanged.
+ * Styling: refined typography, cleaner layout, polished notification bell.
  */
 import { useState } from "react";
 import { T } from "../../constants/theme.js";
@@ -35,77 +21,99 @@ export default function DashboardHeader({
 
   return (
     <header style={{
-      padding:      isMobile ? "13px 16px" : "13px 28px",
-      display:      "flex",
-      alignItems:   "center",
+      padding:        isMobile ? "0 16px" : "0 28px",
+      height:         56,
+      display:        "flex",
+      alignItems:     "center",
       justifyContent: "space-between",
-      gap:          12,
-      borderBottom: `1px solid ${T.goldBorder}`,
-      background:   T.bgSide,
-      position:     "sticky",
-      top:          0,
-      zIndex:       100,
+      gap:            12,
+      borderBottom:   `1px solid ${T.subtle}`,
+      background:     `linear-gradient(90deg, ${T.bgSide} 0%, ${T.bg} 100%)`,
+      position:       "sticky",
+      top:            0,
+      zIndex:         100,
+      flexShrink:     0,
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
     }}>
 
-      {/* ── Left: hamburger + title ───────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      {/* ── Left: hamburger + title ───────────────────────────────────────── */}
+      <div style={{display:"flex", alignItems:"center", gap:12, minWidth:0}}>
+
         {/* Hamburger — mobile only */}
         {isMobile && (
           <button
             onClick={onMenuToggle}
             style={{
-              background:   "transparent",
-              border:       `1px solid ${T.subtle}`,
-              color:        T.gold,
-              cursor:       "pointer",
-              padding:      "6px 9px",
-              borderRadius: 3,
-              fontSize:     16,
-              lineHeight:   1,
-              transition:   "all .15s",
+              display:        "flex",
+              flexDirection:  "column",
+              gap:            4,
+              background:     "transparent",
+              border:         `1px solid ${T.subtle}`,
+              borderRadius:   7,
+              padding:        "7px 8px",
+              cursor:         "pointer",
+              flexShrink:     0,
+              transition:     "border-color .18s ease",
             }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = T.gold}
+            onMouseEnter={e => e.currentTarget.style.borderColor = T.goldBorder}
             onMouseLeave={e => e.currentTarget.style.borderColor = T.subtle}
             aria-label="Toggle navigation"
           >
-            {sidebarOpen ? "✕" : "☰"}
+            {sidebarOpen
+              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={T.gold} strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              : (
+                <>
+                  <span style={{display:"block", width:16, height:1.5, borderRadius:2, background:T.muted}}/>
+                  <span style={{display:"block", width:12, height:1.5, borderRadius:2, background:T.muted}}/>
+                  <span style={{display:"block", width:16, height:1.5, borderRadius:2, background:T.muted}}/>
+                </>
+              )
+            }
           </button>
         )}
 
         {/* Title block */}
-        <div>
+        <div style={{minWidth:0}}>
           <p style={{
             margin:        0,
             fontSize:      8,
             letterSpacing: "0.24em",
             color:         T.gold,
             fontFamily:    "'Cinzel', serif",
+            textTransform: "uppercase",
+            opacity:       0.7,
+            lineHeight:    1,
           }}>
             {subLabel}
           </p>
           <h1 style={{
-            margin:        "2px 0 0",
-            fontSize:      isMobile ? 17 : 22,
+            margin:        "3px 0 0",
+            fontSize:      isMobile ? 16 : 19,
             fontWeight:    600,
             color:         T.white,
             fontFamily:    "'Cinzel', serif",
             letterSpacing: "0.02em",
             lineHeight:    1.1,
+            whiteSpace:    "nowrap",
+            overflow:      "hidden",
+            textOverflow:  "ellipsis",
           }}>
             {title}
           </h1>
         </div>
       </div>
 
-      {/* ── Right: optional badge + notification bell ─────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        {/* Optional count badge (e.g. "3 Pending" used by ITDashboard) */}
+      {/* ── Right: badge + bell ──────────────────────────────────────────── */}
+      <div style={{display:"flex", alignItems:"center", gap:10, flexShrink:0}}>
+
+        {/* Optional badge */}
         {badge && (
           <span style={{
-            fontSize:      10,
+            fontSize:      9.5,
             fontFamily:    "'JetBrains Mono', monospace",
-            padding:       "3px 10px",
-            borderRadius:  2,
+            padding:       "4px 10px",
+            borderRadius:  99,
             background:    T.goldDim,
             border:        `1px solid ${T.goldBorder}`,
             color:         T.gold,
@@ -116,56 +124,61 @@ export default function DashboardHeader({
           </span>
         )}
 
-        {/* Notification bell + dropdown */}
-        <div style={{ position: "relative" }}>
+        {/* Notification bell */}
+        <div style={{position:"relative"}}>
           <button
             onClick={() => setShowNotifs(v => !v)}
             style={{
               width:          36,
               height:         36,
-              borderRadius:   3,
-              background:     showNotifs ? T.goldDim      : "transparent",
+              borderRadius:   9,
+              background:     showNotifs ? T.goldDim : "transparent",
               border:         `1px solid ${showNotifs ? T.goldBorder : T.subtle}`,
-              color:          showNotifs ? T.gold         : T.muted,
+              color:          showNotifs ? T.gold    : T.muted,
               cursor:         "pointer",
-              fontSize:       14,
               display:        "flex",
               alignItems:     "center",
               justifyContent: "center",
-              transition:     "all .15s",
+              transition:     "all .18s ease",
               position:       "relative",
+              flexShrink:     0,
             }}
             onMouseEnter={e => {
               if (!showNotifs) {
-                e.currentTarget.style.borderColor = T.goldBorder;
-                e.currentTarget.style.color       = T.gold;
+                e.currentTarget.style.borderColor  = T.goldBorder;
+                e.currentTarget.style.color        = T.gold;
+                e.currentTarget.style.background   = T.goldDim;
               }
             }}
             onMouseLeave={e => {
               if (!showNotifs) {
-                e.currentTarget.style.borderColor = T.subtle;
-                e.currentTarget.style.color       = T.muted;
+                e.currentTarget.style.borderColor  = T.subtle;
+                e.currentTarget.style.color        = T.muted;
+                e.currentTarget.style.background   = "transparent";
               }
             }}
             aria-label="Notifications"
           >
-            ◉
-            {/* Unread indicator dot */}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+            </svg>
+
+            {/* Unread dot */}
             {unread > 0 && (
               <span style={{
                 position:     "absolute",
-                top:          5,
-                right:        5,
+                top:          6,
+                right:        6,
                 width:        7,
                 height:       7,
                 borderRadius: "50%",
                 background:   T.red,
-                border:       `1.5px solid ${T.bgSide}`,
-              }} />
+                border:       `2px solid ${T.bgSide}`,
+              }}/>
             )}
           </button>
 
-          {/* Dropdown panel */}
+          {/* Dropdown */}
           <NotifPanel
             open={showNotifs}
             onClose={() => setShowNotifs(false)}

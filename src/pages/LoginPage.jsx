@@ -109,7 +109,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-[17px] font-semibold tracking-tight leading-none text-white">
-                XYZ<span className="text-white/40">.</span>
+                Sat Kartar<span className="text-white/40"></span>
               </h1>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] mt-0.5 text-white/30">
                 Campaign Suite

@@ -1,22 +1,23 @@
 /**
- * Field — labelled form field wrapper.
- * Previously copy-pasted into PPCDashboard, ManagerDashboard, and PMDashboard.
- *
- * @prop {string}  label - uppercase field label
- * @prop {string=} hint  - optional parenthetical hint shown in muted text
+ * Field — premium labelled form field wrapper.
+ * Props unchanged.
  */
 import { T } from "../../constants/theme.js";
 
 export default function Field({ label, hint, children }) {
   return (
-    <div style={{ marginBottom: 20 }}>
+    <div style={{marginBottom:18}}>
       <div style={{
-        fontSize:      9,
+        fontSize:      9.5,
         fontWeight:    600,
         letterSpacing: "0.18em",
-        color:         T.gold,
+        color:         "rgba(200,168,74,0.7)",
         fontFamily:    "'Cinzel', serif",
         marginBottom:  8,
+        textTransform: "uppercase",
+        display:       "flex",
+        alignItems:    "center",
+        gap:           6,
       }}>
         {label}
         {hint && (
@@ -24,9 +25,9 @@ export default function Field({ label, hint, children }) {
             color:         T.muted,
             fontWeight:    400,
             fontSize:      9,
-            letterSpacing: "0.06em",
+            letterSpacing: "0.04em",
             fontFamily:    "'DM Sans', sans-serif",
-            marginLeft:    6,
+            textTransform: "none",
           }}>
             ({hint})
           </span>
