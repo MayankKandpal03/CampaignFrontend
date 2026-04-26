@@ -1,19 +1,18 @@
 /**
  * useCampaigns — campaign store + socket event wiring.
  *
- * FIXES:
- *  1. DOUBLE CAMPAIGN: `addCampaign` now checks whether the campaign already
- *     exists in the store before adding it. Previously, the store's
- *     `createCampaign` action added the campaign AND the socket event added it
- *     again, showing duplicates until the page refreshed.
+ * FIXES (original):
+ *  1. DOUBLE CAMPAIGN: `addCampaign` checks existence before adding.
+ *  2. DOUBLE NOTIFICATION: local addNotification calls removed from page handlers.
+ *  3. NOTIFICATION MESSAGES: uses `c.performerName` for human-readable messages.
  *
- *  2. DOUBLE NOTIFICATION: The local `addNotification("Campaign submitted…")`
- *     calls have been removed from all page handlers. Only the socket event
- *     fires the notification, so the user sees exactly one message per action.
- *
- *  3. NOTIFICATION MESSAGES: Use `c.performerName` (injected by backend) to
- *     produce human-readable messages like "Campaign created by john".
- *     Distinguish cancelled / updated / acknowledged / not-done clearly.
+ * NEW — campaign:schedule_fired:
+ *  Emitted by the server when a previously-scheduled campaign timer fires and
+ *  the campaign is actually delivered to IT. PPC/Manager/PM dashboards receive
+ *  this event so they patch the campaign in the store immediately.
+ *  Combined with the smart-timeout `now` state in each dashboard, the edit
+ *  button locks and the ticket state switches to "Sent to IT" in real-time
+ *  with zero polling.
  */
 import useCampaignStore from "../stores/useCampaignStore.js";
 import { useSocket }    from "./useSocket.js";
@@ -28,11 +27,6 @@ export const useCampaigns = ({
   const updateCampaign = useCampaignStore(s => s.updateCampaign);
 
   // ── Store mutation helpers ─────────────────────────────────────────────────
-  /**
-   * FIX: Check existence before adding to prevent duplicates.
-   * The store's `createCampaign` action already adds the campaign optimistically.
-   * When the socket echo arrives, we skip adding it again.
-   */
   const addCampaign = c => {
     const exists = useCampaignStore.getState().campaigns.some(x => x._id === c._id);
     if (!exists) {
@@ -49,13 +43,11 @@ export const useCampaigns = ({
   useSocket(
     enableSocket
       ? {
-          // campaign:created — PPC or Manager submitted a new campaign
           "campaign:created": c => {
             addCampaign(c);
             onNotification(`Campaign created by ${c.performerName || "someone"}`);
           },
 
-          // campaign:updated — PPC edited, Manager edited, or PM cancelled
           "campaign:updated": c => {
             patchCampaign(c);
             const msg =
@@ -65,7 +57,6 @@ export const useCampaigns = ({
             onNotification(msg);
           },
 
-          // campaign:it_queued — PM approved and forwarded to IT
           "campaign:it_queued": c => {
             patchCampaign(c);
             onNotification(
@@ -73,7 +64,16 @@ export const useCampaigns = ({
             );
           },
 
-          // campaign:it_ack — IT responded (done or not done)
+          /**
+           * campaign:schedule_fired — server timer has fired; campaign now delivered
+           * to IT. Patches the campaign so dashboards reflect "Sent to IT" and lock
+           * the edit button immediately (the `now` smart-timeout drives the visual).
+           * No notification needed — PM approval already informed the user.
+           */
+          "campaign:schedule_fired": c => {
+            patchCampaign(c);
+          },
+
           "campaign:it_ack": c => {
             patchCampaign(c);
             const msg =
@@ -83,7 +83,6 @@ export const useCampaigns = ({
             onNotification(msg);
           },
 
-          // campaign:deleted — someone removed a campaign
           "campaign:deleted": d => {
             useCampaignStore.setState(s => ({
               campaigns: s.campaigns.filter(x => x._id !== d._id),
