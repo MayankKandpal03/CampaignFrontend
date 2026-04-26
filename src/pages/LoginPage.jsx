@@ -6,6 +6,7 @@
  *  - API call delegated to services/authService.js (login())
  *  - FIELDS config array was already local; kept here (it's page-specific)
  *  - All logic (handleInput, handleSubmit, routing) unchanged
+ *  - accessToken saved to localStorage for mobile browsers that block cross-origin cookies
  */
 import { useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,7 +31,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   const [formData,    setFormData]    = useState({ email: "", password: "" });
-  const [status,      setStatus]      = useState("idle");   // idle | loading | success | error
+  const [status,      setStatus]      = useState("idle");
   const [error,       setError]       = useState("");
   const [welcomeName, setWelcomeName] = useState("");
 
@@ -52,7 +53,14 @@ export default function LoginPage() {
     setError("");
     setStatus("loading");
     try {
-      const { user } = await login(formData);   // ← service call (was api.post inline)
+      const { user, accessToken } = await login(formData);
+
+      // Save token to localStorage so mobile browsers can send it
+      // via Authorization header (cross-origin cookies blocked on mobile)
+      if (accessToken) {
+        localStorage.setItem("token", accessToken);
+      }
+
       setUser(user);
       setWelcomeName(user.username || user.email);
       setStatus("success");
