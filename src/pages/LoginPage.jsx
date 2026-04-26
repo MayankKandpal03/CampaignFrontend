@@ -1,12 +1,9 @@
 /**
- * LoginPage — refactored.
+ * LoginPage — with mobile debug panel.
  *
- * WHAT CHANGED:
- *  - StarField and Spinner moved to components/auth/StarField.jsx
- *  - API call delegated to services/authService.js (login())
- *  - FIELDS config array was already local; kept here (it's page-specific)
- *  - All logic (handleInput, handleSubmit, routing) unchanged
- *  - accessToken saved to localStorage for mobile browsers that block cross-origin cookies
+ * DEBUG MODE: Shows a red panel on screen with the real error details.
+ * This helps diagnose mobile issues where you can't open DevTools.
+ * Once the issue is fixed, remove the <DebugPanel> component and debugInfo state.
  */
 import { useState, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -26,6 +23,43 @@ const ROLE_ROUTES = {
   it:                "/it-dashboard",
 };
 
+// ── Debug panel — shows real error info on screen (useful on mobile) ──────────
+function DebugPanel({ info }) {
+  const [open, setOpen] = useState(false);
+  if (!info) return null;
+  return (
+    <div style={{
+      position: "fixed", bottom: 12, left: 12, right: 12, zIndex: 9999,
+      background: "#1a0000", border: "1px solid #ff4444", borderRadius: 8,
+      fontFamily: "monospace", fontSize: 11,
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{ width: "100%", padding: "8px 12px", background: "transparent", border: "none", color: "#ff6666", textAlign: "left", cursor: "pointer", fontFamily: "monospace", fontSize: 12, fontWeight: "bold" }}
+      >
+        🐛 DEBUG INFO (tap to {open ? "hide" : "show"})
+      </button>
+      {open && (
+        <div style={{ padding: "0 12px 12px", color: "#ffaaaa" }}>
+          {Object.entries(info).map(([k, v]) => (
+            <div key={k} style={{ marginBottom: 4 }}>
+              <span style={{ color: "#ff8888" }}>{k}: </span>
+              <span style={{ color: "#ffcccc", wordBreak: "break-all" }}>{String(v ?? "—")}</span>
+            </div>
+          ))}
+          <div style={{ marginTop: 8, color: "#888", fontSize: 10 }}>
+            WHAT THIS MEANS:<br/>
+            "Network Error" / ERR_NETWORK → CORS or backend down<br/>
+            "timeout" / ECONNABORTED → backend too slow (Railway sleeping)<br/>
+            401 → wrong email/password<br/>
+            500 → backend crash (check Railway logs)
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const setUser  = useAuthStore(s => s.setUser);
   const navigate = useNavigate();
@@ -34,6 +68,7 @@ export default function LoginPage() {
   const [status,      setStatus]      = useState("idle");
   const [error,       setError]       = useState("");
   const [welcomeName, setWelcomeName] = useState("");
+  const [debugInfo,   setDebugInfo]   = useState(null); // ← debug state
 
   const isLoading = status === "loading";
   const isSuccess = status === "success";
@@ -51,12 +86,12 @@ export default function LoginPage() {
       return;
     }
     setError("");
+    setDebugInfo(null);
     setStatus("loading");
     try {
       const { user, accessToken } = await login(formData);
 
-      // Save token to localStorage so mobile browsers can send it
-      // via Authorization header (cross-origin cookies blocked on mobile)
+      // Save token for mobile (cross-origin cookies blocked)
       if (accessToken) {
         localStorage.setItem("token", accessToken);
       }
@@ -65,13 +100,40 @@ export default function LoginPage() {
       setWelcomeName(user.username || user.email);
       setStatus("success");
       setTimeout(() => navigate(ROLE_ROUTES[user.role] || "/login"), 2000);
+
     } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-        (err?.response?.status === 401
-          ? "Invalid credentials. Please try again."
-          : "Something went wrong. Please try again.")
-      );
+      // ── Collect all debug info ────────────────────────────────────────────
+      const debug = {
+        errorMessage:   err.message,                       // "Network Error", "timeout", etc.
+        errorCode:      err.code,                          // ERR_NETWORK, ECONNABORTED, etc.
+        httpStatus:     err?.response?.status ?? "none",   // 401, 500, etc.
+        serverMessage:  err?.response?.data?.message ?? "no response body",
+        requestURL:     err?.config?.url ?? "unknown",
+        baseURL:        err?.config?.baseURL ?? "unknown",
+        withCredentials:String(err?.config?.withCredentials),
+        tokenInStorage: localStorage.getItem("token") ? "yes" : "no",
+        userAgent:      navigator.userAgent.slice(0, 80),
+      };
+
+      console.error("[LoginPage] Error details:", debug);
+      setDebugInfo(debug); // ← show on screen
+
+      // ── User-facing error message ─────────────────────────────────────────
+      let userMsg = "Something went wrong. Please try again.";
+
+      if (err.code === "ECONNABORTED" || err.message?.includes("timeout")) {
+        userMsg = "Request timed out — server may be waking up. Please try again in 30 seconds.";
+      } else if (err.code === "ERR_NETWORK" || err.message === "Network Error") {
+        userMsg = "Cannot reach server — check your internet or the server may be down. (See debug panel below)";
+      } else if (err?.response?.status === 401) {
+        userMsg = "Invalid credentials. Please try again.";
+      } else if (err?.response?.status === 500) {
+        userMsg = "Server error. Please try again later.";
+      } else if (err?.response?.data?.message) {
+        userMsg = err.response.data.message;
+      }
+
+      setError(userMsg);
       setStatus("error");
     }
   }, [formData, navigate, setUser]);
@@ -152,7 +214,7 @@ export default function LoginPage() {
 
             {/* Error banner */}
             <div style={{
-              maxHeight:    error ? "80px" : "0",
+              maxHeight:    error ? "120px" : "0",
               opacity:      error ? 1 : 0,
               overflow:     "hidden",
               marginBottom: error ? "20px" : "0",
@@ -183,6 +245,9 @@ export default function LoginPage() {
                     value={formData[name]}
                     onChange={handleInput}
                     disabled={isBusy}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck="false"
                     className="input-spark w-full px-4 py-2.75 rounded-xl text-[13.5px] outline-none transition-colors duration-300 disabled:opacity-50 bg-white/6 border border-white/12 text-white placeholder-white/20 focus:border-white/35 focus:bg-white/8"
                   />
                 </div>
@@ -247,6 +312,9 @@ export default function LoginPage() {
           </div>
         </div>
       </footer>
+
+      {/* ── Debug panel — fixed at bottom of screen ── */}
+      <DebugPanel info={debugInfo} />
     </div>
   );
 }

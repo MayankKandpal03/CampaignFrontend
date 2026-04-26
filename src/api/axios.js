@@ -1,11 +1,13 @@
 import axios from "axios";
 
+const BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://campaignbackend-production.up.railway.app/api/v1";
+
 // Create axios instance
 const api = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_BASE_URL ||
-    "https://campaignbackend-production.up.railway.app/api/v1",
-  timeout: 10000, // Maximum time for a request after this axios will throw timeout error
+  baseURL: BASE_URL,
+  timeout: 30000, // increased from 10000 — Railway free tier can be slow to wake
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
@@ -13,39 +15,38 @@ const api = axios.create({
   },
 });
 
-// Interceptors let us run a code before a request or response is sent
-// Here it is used to add token as Authorization: Bearer <token> and return new config
+// Request interceptor — attach token from localStorage (needed on mobile where cookies are blocked)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
-
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
   (error) => Promise.reject(error),
 );
-// Here
+
+// Response interceptor — log errors clearly for debugging
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error.response?.status;
+    const status = error?.response?.status;
+    const message = error?.response?.data?.message;
 
-    if (status === 401) {
-      console.error("Unauthorized");
-      // optional: redirect to login
-      // window.location.href = "/login";
-    }
+    // Log full error for debugging — remove after fixing
+    console.error("[API Error]", {
+      url: error?.config?.url,
+      method: error?.config?.method,
+      status,
+      message,
+      errorMessage: error.message, // "Network Error", "timeout", etc.
+      code: error.code,            // "ECONNABORTED" = timeout, "ERR_NETWORK" = CORS/offline
+    });
 
-    if (status === 403) {
-      console.error("Forbidden");
-    }
-
-    if (status === 500) {
-      console.error("Server error");
-    }
+    if (status === 401) console.error("Unauthorized — token may be expired");
+    if (status === 403) console.error("Forbidden");
+    if (status === 500) console.error("Server error");
 
     return Promise.reject(error);
   },
