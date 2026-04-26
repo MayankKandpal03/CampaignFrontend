@@ -1,11 +1,15 @@
 /**
- * LoginPage — with mobile debug panel.
+ * LoginPage
  *
- * DEBUG MODE: Shows a red panel on screen with the real error details.
- * This helps diagnose mobile issues where you can't open DevTools.
- * Once the issue is fixed, remove the <DebugPanel> component and debugInfo state.
+ * WHY localStorage IS NEEDED:
+ * Mobile networks block cross-origin cookies (even SameSite=None; Secure).
+ * The axios interceptor in api/axios.js reads localStorage("token") and injects
+ * it as an Authorization header — this path works on every network.
+ * The httpOnly cookie still works on WiFi/desktop as a fallback.
+ * The accessToken is also forwarded to setUser so the auth store can pass it
+ * to the socket handshake via auth: { token }.
  */
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../stores/useAuthStore.js";
 import { login } from "../services/authService.js";
@@ -23,43 +27,6 @@ const ROLE_ROUTES = {
   it:                "/it-dashboard",
 };
 
-// ── Debug panel — shows real error info on screen (useful on mobile) ──────────
-function DebugPanel({ info }) {
-  const [open, setOpen] = useState(false);
-  if (!info) return null;
-  return (
-    <div style={{
-      position: "fixed", bottom: 12, left: 12, right: 12, zIndex: 9999,
-      background: "#1a0000", border: "1px solid #ff4444", borderRadius: 8,
-      fontFamily: "monospace", fontSize: 11,
-    }}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        style={{ width: "100%", padding: "8px 12px", background: "transparent", border: "none", color: "#ff6666", textAlign: "left", cursor: "pointer", fontFamily: "monospace", fontSize: 12, fontWeight: "bold" }}
-      >
-        🐛 DEBUG INFO (tap to {open ? "hide" : "show"})
-      </button>
-      {open && (
-        <div style={{ padding: "0 12px 12px", color: "#ffaaaa" }}>
-          {Object.entries(info).map(([k, v]) => (
-            <div key={k} style={{ marginBottom: 4 }}>
-              <span style={{ color: "#ff8888" }}>{k}: </span>
-              <span style={{ color: "#ffcccc", wordBreak: "break-all" }}>{String(v ?? "—")}</span>
-            </div>
-          ))}
-          <div style={{ marginTop: 8, color: "#888", fontSize: 10 }}>
-            WHAT THIS MEANS:<br/>
-            "Network Error" / ERR_NETWORK → CORS or backend down<br/>
-            "timeout" / ECONNABORTED → backend too slow (Railway sleeping)<br/>
-            401 → wrong email/password<br/>
-            500 → backend crash (check Railway logs)
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function LoginPage() {
   const setUser  = useAuthStore(s => s.setUser);
   const navigate = useNavigate();
@@ -68,7 +35,6 @@ export default function LoginPage() {
   const [status,      setStatus]      = useState("idle");
   const [error,       setError]       = useState("");
   const [welcomeName, setWelcomeName] = useState("");
-  const [debugInfo,   setDebugInfo]   = useState(null); // ← debug state
 
   const isLoading = status === "loading";
   const isSuccess = status === "success";
@@ -86,54 +52,28 @@ export default function LoginPage() {
       return;
     }
     setError("");
-    setDebugInfo(null);
     setStatus("loading");
     try {
       const { user, accessToken } = await login(formData);
 
-      // Save token for mobile (cross-origin cookies blocked)
+      // Store in localStorage so the axios interceptor can attach it as
+      // Authorization: Bearer <token> on mobile networks where cookies are blocked.
       if (accessToken) {
         localStorage.setItem("token", accessToken);
       }
 
-      setUser(user);
+      // Also store in auth store so useSocket can use it for handshake auth.
+      setUser(user, accessToken ?? null);
       setWelcomeName(user.username || user.email);
       setStatus("success");
       setTimeout(() => navigate(ROLE_ROUTES[user.role] || "/login"), 2000);
-
     } catch (err) {
-      // ── Collect all debug info ────────────────────────────────────────────
-      const debug = {
-        errorMessage:   err.message,                       // "Network Error", "timeout", etc.
-        errorCode:      err.code,                          // ERR_NETWORK, ECONNABORTED, etc.
-        httpStatus:     err?.response?.status ?? "none",   // 401, 500, etc.
-        serverMessage:  err?.response?.data?.message ?? "no response body",
-        requestURL:     err?.config?.url ?? "unknown",
-        baseURL:        err?.config?.baseURL ?? "unknown",
-        withCredentials:String(err?.config?.withCredentials),
-        tokenInStorage: localStorage.getItem("token") ? "yes" : "no",
-        userAgent:      navigator.userAgent.slice(0, 80),
-      };
-
-      console.error("[LoginPage] Error details:", debug);
-      setDebugInfo(debug); // ← show on screen
-
-      // ── User-facing error message ─────────────────────────────────────────
-      let userMsg = "Something went wrong. Please try again.";
-
-      if (err.code === "ECONNABORTED" || err.message?.includes("timeout")) {
-        userMsg = "Request timed out — server may be waking up. Please try again in 30 seconds.";
-      } else if (err.code === "ERR_NETWORK" || err.message === "Network Error") {
-        userMsg = "Cannot reach server — check your internet or the server may be down. (See debug panel below)";
-      } else if (err?.response?.status === 401) {
-        userMsg = "Invalid credentials. Please try again.";
-      } else if (err?.response?.status === 500) {
-        userMsg = "Server error. Please try again later.";
-      } else if (err?.response?.data?.message) {
-        userMsg = err.response.data.message;
-      }
-
-      setError(userMsg);
+      setError(
+        err?.response?.data?.message ||
+        (err?.response?.status === 401
+          ? "Invalid credentials. Please try again."
+          : "Something went wrong. Please try again.")
+      );
       setStatus("error");
     }
   }, [formData, navigate, setUser]);
@@ -154,11 +94,9 @@ export default function LoginPage() {
           to   { opacity: 1; transform: translateY(0);   }
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
         .anim-card    { animation: fadeUp .58s cubic-bezier(.22,1,.36,1) both; }
         .anim-spinner { animation: spin .78s linear infinite; }
         .btn-label    { animation: fadeIn .22s ease both; }
-
         .input-spark:focus {
           animation: sparkDark 1.9s ease-in-out infinite alternate;
         }
@@ -170,7 +108,6 @@ export default function LoginPage() {
 
       <StarField />
 
-      {/* Header */}
       <header className="relative z-10 w-full bg-[#07070c]/90 border-b border-white/6 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
           <div className="flex items-center gap-3">
@@ -179,7 +116,7 @@ export default function LoginPage() {
             </div>
             <div>
               <h1 className="text-[17px] font-semibold tracking-tight leading-none text-white">
-                Sat Kartar<span className="text-white/40"></span>
+                Sat Kartar
               </h1>
               <p className="text-[10px] font-medium uppercase tracking-[0.18em] mt-0.5 text-white/30">
                 Campaign Suite
@@ -189,12 +126,9 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Main */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-105 anim-card">
           <div className="rounded-2xl p-9 backdrop-blur-xl bg-white/4 border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_60px_rgba(0,0,0,0.6)]">
-
-            {/* Heading */}
             <div className="mb-8">
               <h2
                 key={isSuccess ? "welcome" : "signin"}
@@ -214,7 +148,7 @@ export default function LoginPage() {
 
             {/* Error banner */}
             <div style={{
-              maxHeight:    error ? "120px" : "0",
+              maxHeight:    error ? "80px" : "0",
               opacity:      error ? 1 : 0,
               overflow:     "hidden",
               marginBottom: error ? "20px" : "0",
@@ -230,7 +164,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-5">
               {FIELDS.map(({ name, type, placeholder, label }) => (
                 <div key={name} className="space-y-2">
@@ -296,7 +229,6 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="relative z-10 w-full bg-[#07070c]/80 border-t border-white/5 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-[11.5px] text-white/20">
@@ -312,9 +244,6 @@ export default function LoginPage() {
           </div>
         </div>
       </footer>
-
-      {/* ── Debug panel — fixed at bottom of screen ── */}
-      <DebugPanel info={debugInfo} />
     </div>
   );
 }

@@ -1,18 +1,28 @@
 // src/pages/ITDashboard.jsx
 /**
- * CHANGES:
- *  - Daily tasks now fetched on MOUNT (not only when section activates).
- *    The nav badge shows live count immediately; switching to "Schedule Tasks"
- *    shows data without a loading flash.
- *  - Layout: height:100vh, overflowY:auto on main — scrollbar always in viewport.
- *  - Table sections: flex:1 + inner overflow:auto for in-place horizontal scroll.
+ * FIXES:
+ *  1. LOGOUT: Was calling `logout` directly (from useAuthStore) with no
+ *     navigation, so the user stayed on the protected page. Now uses the
+ *     shared `useLogout` hook which calls logout() then navigate("/login"),
+ *     matching PPCDashboard / ManagerDashboard.
+ *
+ *  2. SCHEDULED CAMPAIGNS NOT APPEARING: `itCampaigns` was filtered with a
+ *     plain `const now = Date.now()` — a constant captured at render time.
+ *     Future-scheduled campaigns would never flip to visible until an external
+ *     re-render happened. Now uses the same reactive `now` state + smart
+ *     setTimeout pattern as PPCDashboard / CampaignsTable, including the
+ *     PATH B justFired check for the campaign:schedule_fired socket event.
+ *
+ *  3. Daily tasks are still fetched on MOUNT so the nav badge and section
+ *     are populated immediately without a loading flash.
  */
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 import useCampaignStore from "../stores/useCampaignStore.js";
 import useAuthStore     from "../stores/useAuthStore.js";
 import useNotifStore    from "../stores/useNotificationStore.js";
 import { useSocket }    from "../hooks/useSocket.js";
+import { useLogout }    from "../hooks/useLogout.js";
 import api              from "../api/axios.js";
 
 import { fmt, initials } from "../utils/formatters.js";
@@ -50,7 +60,6 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
-
         <div className="modal-body">
           <div className="field-group">
             <label className="field-label">Scheduled Time</label>
@@ -64,7 +73,6 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
             ℹ "Done at [time]" will be appended automatically.
           </p>
         </div>
-
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Discard</button>
           <button className="btn btn-confirm" disabled={loading} onClick={() => onConfirm(task._id, message)}>
@@ -81,9 +89,12 @@ export default function ITDashboard() {
   const campaigns      = useCampaignStore(s => s.campaigns);
   const getCampaign    = useCampaignStore(s => s.getCampaign);
   const updateCampaign = useCampaignStore(s => s.updateCampaign);
-  const { user, role, logout } = useAuthStore();
+  const { user, role } = useAuthStore();
   const addNotification = useNotifStore(s => s.addNotification);
   const unread          = useNotifStore(s => s.unread);
+
+  // FIX 1: Use useLogout so logout navigates to /login.
+  const handleLogout = useLogout();
 
   const [activeSection, setActiveSection] = useState("campaigns");
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
@@ -99,7 +110,40 @@ export default function ITDashboard() {
   const [toasts,     setToasts]     = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ── Fetch daily tasks on MOUNT so badge count and section data are ready ──
+  // FIX 2: Reactive now state — same pattern as PPCDashboard / CampaignsTable.
+  // A plain `Date.now()` constant means future-scheduled campaigns never appear
+  // until an external re-render happens.
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const currentReal = Date.now();
+
+    // PATH B: campaign:schedule_fired patched the store, scheduleAt crossed
+    // from future (per stale `now`) to past (in real time). Update immediately.
+    const justFired = campaigns.some(c =>
+      c.scheduleAt &&
+      new Date(c.scheduleAt).getTime() > now &&
+      new Date(c.scheduleAt).getTime() <= currentReal
+    );
+    if (justFired) {
+      setNow(currentReal);
+      return;
+    }
+
+    // PATH A: schedule a timeout for the nearest upcoming scheduleAt.
+    const nextTime = campaigns
+      .filter(c => c.scheduleAt)
+      .map(c => new Date(c.scheduleAt).getTime())
+      .filter(t => t > currentReal)
+      .sort((a, b) => a - b)[0];
+
+    if (!nextTime) return;
+    const delay = nextTime - currentReal;
+    const id = setTimeout(() => setNow(Date.now()), delay + 200);
+    return () => clearTimeout(id);
+  }, [campaigns, now]);
+
+  // Fetch daily tasks on mount so nav badge and section are immediately populated.
   const fetchDueTasks = useCallback(async () => {
     setTaskFetching(true);
     try {
@@ -112,10 +156,9 @@ export default function ITDashboard() {
     }
   }, []);
 
-  // Fetch campaigns + daily tasks together on mount
   useEffect(() => {
     getCampaign().catch(console.error);
-    fetchDueTasks(); // ← NEW: fetch immediately so badge & section are populated
+    fetchDueTasks();
   }, [getCampaign, fetchDueTasks]);
 
   // Socket handlers
@@ -136,6 +179,10 @@ export default function ITDashboard() {
     "campaign:deleted": d => {
       useCampaignStore.setState(s => ({ campaigns: s.campaigns.filter(x => x._id !== d._id) }));
     },
+    // Patch the store so the justFired check in the now-state effect fires.
+    "campaign:schedule_fired": c => {
+      useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id===c._id ? c : x) }));
+    },
     "dailytask:queued": task => {
       setDailyTasks(prev => {
         const exists = prev.some(t => t._id === task._id);
@@ -146,26 +193,24 @@ export default function ITDashboard() {
     },
   });
 
-  // 60-second auto-refresh for campaigns
+  // 60-second auto-refresh as a belt-and-suspenders fallback.
   useEffect(() => {
     const id = setInterval(() => getCampaign().catch(console.error), 60_000);
     return () => clearInterval(id);
   }, [getCampaign]);
 
-  // Derived campaign list
-  const now = Date.now();
-  const itCampaigns = campaigns.filter(c => {
+  // Derived campaign list — depends on reactive `now`, not inline Date.now().
+  const itCampaigns = useMemo(() => campaigns.filter(c => {
     if (c.action !== "approve") return false;
     if (c.status  === "cancel") return false;
     if (c.acknowledgement)      return false;
     if (c.scheduleAt) return new Date(c.scheduleAt).getTime() <= now;
     return true;
-  });
+  }), [campaigns, now]);
 
-  const doneCount    = campaigns.filter(c => c.acknowledgement === "done").length;
+  const doneCount    = useMemo(() => campaigns.filter(c => c.acknowledgement === "done").length, [campaigns]);
   const pendingCount = itCampaigns.length;
 
-  // Toast helpers
   const pushToast = useCallback((msg, type = "success") => {
     const id = Date.now();
     setToasts(p => [...p, { id, msg, type }]);
@@ -179,7 +224,6 @@ export default function ITDashboard() {
     pushToast("Campaigns refreshed");
   };
 
-  // Campaign acknowledgement
   const handleAck = async ({ acknowledgement, itMessage }) => {
     if (!ackTarget) return;
     setAckLoading(true);
@@ -200,7 +244,6 @@ export default function ITDashboard() {
     } finally { setAckLoading(false); }
   };
 
-  // Daily task acknowledgement
   const handleTaskAck = async (taskId, message) => {
     setTaskAckLoading(true);
     try {
@@ -220,7 +263,6 @@ export default function ITDashboard() {
   ];
 
   return (
-    // height:100vh keeps the layout in viewport — scrollbar stays accessible
     <div className="it-root" style={{ height:"100vh", overflow:"hidden" }}>
       <div className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`} onClick={() => setSidebarOpen(false)}/>
 
@@ -230,7 +272,6 @@ export default function ITDashboard() {
           <div className="sidebar-brand-name">Campaign<i style={{ fontStyle:"normal", opacity:0.4 }}>.</i></div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
-
         <div className="sidebar-user">
           <div className="user-avatar">{initials(user || "IT")}</div>
           <div>
@@ -238,7 +279,6 @@ export default function ITDashboard() {
             <div className="user-info-role">{role}</div>
           </div>
         </div>
-
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
             <button key={item.id} className={`nav-item ${activeSection===item.id ? "active" : ""}`}
@@ -253,13 +293,13 @@ export default function ITDashboard() {
             </button>
           ))}
         </nav>
-
         <div className="sidebar-footer">
-          <button className="logout-btn" onClick={logout}><span>↩</span> Sign Out</button>
+          {/* FIX: was calling logout() directly with no navigation */}
+          <button className="logout-btn" onClick={handleLogout}><span>↩</span> Sign Out</button>
         </div>
       </aside>
 
-      {/* ── Main — overflowY:auto keeps scrollbar at viewport bottom ── */}
+      {/* ── Main ── */}
       <div className="it-main" style={{ display:"flex", flexDirection:"column", overflow:"hidden" }}>
         <header className="it-header">
           <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -281,7 +321,6 @@ export default function ITDashboard() {
         {/* ════════════════ CAMPAIGNS ════════════════ */}
         {activeSection === "campaigns" && (
           <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            {/* Stats row */}
             <div className="stats-row" style={{ flexShrink:0 }}>
               <div className="stat-card">
                 <div className="stat-label">Pending Action</div>
@@ -299,15 +338,12 @@ export default function ITDashboard() {
                 <div className="stat-sub">Approved by PM (all time)</div>
               </div>
             </div>
-
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Request Queue</span>
               <button className="refresh-btn" onClick={handleRefresh} disabled={refreshing}>
                 {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
-
-            {/* Table — scrollable inside viewport */}
             <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
               {itCampaigns.length === 0 ? (
                 <div className="table-empty">
@@ -365,15 +401,12 @@ export default function ITDashboard() {
                 </div>
               </div>
             </div>
-
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Today's Task Queue</span>
               <button className="refresh-btn" onClick={fetchDueTasks} disabled={taskFetching}>
                 {taskFetching ? "⟳ Loading…" : "⟳ Refresh"}
               </button>
             </div>
-
-            {/* Table — scrollable inside viewport */}
             <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
               {taskFetching ? (
                 <div className="table-empty">
@@ -419,7 +452,6 @@ export default function ITDashboard() {
         )}
       </div>
 
-      {/* Modals */}
       {ackTarget && (
         <AckModal campaign={ackTarget} onClose={() => setAckTarget(null)} onConfirm={handleAck} loading={ackLoading}/>
       )}
@@ -427,7 +459,6 @@ export default function ITDashboard() {
         <TaskAckModal task={taskAckTarget} onClose={() => setTaskAckTarget(null)} onConfirm={handleTaskAck} loading={taskAckLoading}/>
       )}
 
-      {/* Toasts */}
       <div className="toast-container">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.type==="warn" ? "warn" : ""}`}>{t.msg}</div>

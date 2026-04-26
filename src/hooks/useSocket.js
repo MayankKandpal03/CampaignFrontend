@@ -1,66 +1,77 @@
 /**
  * useSocket — establishes Socket.io connection and registers event handlers.
  *
- * ROOT CAUSE FIX — Stale Closures:
+ * FIX — Cross-origin socket auth:
+ * The backend socket middleware reads `socket.handshake.auth?.token` first,
+ * then falls back to the cookie. The accessToken cookie is httpOnly — JS cannot
+ * read it to pass it there. On mobile networks (and some desktop cross-origin
+ * setups) the browser does not forward httpOnly cookies during a WebSocket
+ * upgrade to a different origin.
  *
- * The previous implementation captured `eventHandlers` at mount time:
+ * We read `accessToken` from the persisted auth store and pass it via
+ * `auth: { token }` in the io() options. This is sent as part of the handshake
+ * payload and is completely unaffected by cookie/SameSite restrictions.
+ * The backend socket.js middleware already checks this path first — no backend
+ * changes are needed.
  *
- *   useEffect(() => {
- *     socket.on("campaign:created", handler); // `handler` is frozen at mount
- *   }, []);
- *
- * When React re-renders (e.g., `addNotification` reference changes after a
- * Zustand store update, or `setCampaigns` in PMDashboard changes), the socket
- * still calls the OLD, stale handler. This caused:
- *   - Notifications firing into discarded closure state → no bell update
- *   - setCampaigns calling a stale reference → no table update until refresh
- *   - "Created by" always showing "unknown" until refresh
- *
- * FIX — Ref-based delegation:
- *   1. Store `eventHandlers` in a mutable ref (updated every render, no deps)
- *   2. Register ONE stable wrapper per event at mount
- *   3. Each wrapper delegates to `ref.current[event]` at call time
- *   → The socket always calls the LATEST handler, never a stale one
+ * Stale closure fix (already present, preserved):
+ * Handlers are stored in a mutable ref so the socket always calls the latest
+ * version without re-registering listeners on every render.
  */
 import { useEffect, useRef } from "react";
 import { io } from "socket.io-client";
+import useAuthStore from "../stores/useAuthStore.js";
 
 export const useSocket = (eventHandlers = {}) => {
-  // Mutable ref — always holds the latest handlers without triggering re-renders
   const handlersRef = useRef(eventHandlers);
+  const accessToken = useAuthStore(s => s.accessToken);
 
-  // Update ref synchronously on every render so it always points to the latest
-  // handlers. No deps array — this runs every render intentionally.
+  // Keep ref current on every render (no deps — intentional).
   useEffect(() => {
     handlersRef.current = eventHandlers;
   });
 
   useEffect(() => {
-    // Skip connecting if no handlers provided (enableSocket: false path)
     if (Object.keys(handlersRef.current).length === 0) return;
 
     const socket = io(
-      import.meta.env.VITE_SOCKET_URL || "https://campaignsatkartar.up.railway.app",
-      { withCredentials: true }
+      import.meta.env.VITE_SOCKET_URL || "https://campaignbackend-production.up.railway.app",
+      {
+        withCredentials: true,
+        // Primary auth path — works cross-origin regardless of cookie policy.
+        auth: { token: accessToken ?? "" },
+        // Start with WebSocket directly to avoid a polling round-trip that
+        // can sometimes drop auth context on cross-origin proxies.
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1500,
+        reconnectionDelayMax: 10000,
+      }
     );
 
-    // Stable wrapper functions: registered once at mount, but they delegate
-    // to handlersRef.current at call time → always calls the latest handler.
+    socket.on("connect", () =>
+      console.log(`[Socket] Connected (${socket.id})`)
+    );
+    socket.on("connect_error", err =>
+      console.error("[Socket] Connection error:", err.message)
+    );
+    socket.on("disconnect", reason =>
+      console.warn("[Socket] Disconnected:", reason)
+    );
+
     const wrappers = {};
     Object.keys(handlersRef.current).forEach(event => {
-      wrappers[event] = (data) => {
-        // handlersRef.current is always the latest version from the last render
-        handlersRef.current[event]?.(data);
-      };
+      wrappers[event] = data => handlersRef.current[event]?.(data);
       socket.on(event, wrappers[event]);
     });
 
     return () => {
-      // Clean up all registered wrappers before disconnecting
-      Object.entries(wrappers).forEach(([event, wrapper]) => {
-        socket.off(event, wrapper);
-      });
+      Object.entries(wrappers).forEach(([event, wrapper]) =>
+        socket.off(event, wrapper)
+      );
       socket.disconnect();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentional, see above
+  // Re-create the socket when the token changes (login / logout).
+  }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 };
