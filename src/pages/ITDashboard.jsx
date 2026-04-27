@@ -1,31 +1,11 @@
 // src/pages/ITDashboard.jsx
 /**
- * CROSS-TAB NOTIFICATION ARCHITECTURE
- * ────────────────────────────────────
- * React overlays are scoped to this component tree and cannot appear over
- * other browser tabs or applications. Two mechanisms handle this:
- *
- * 1. Native OS Notification (Notification API)
- *    Shows an OS-level alert above ALL windows, even when the browser is
- *    minimised or the user is on a completely different website.
- *    → Requires explicit "granted" permission from the user.
- *    → A visible permission banner is shown until the user grants it.
- *    → Clicking the OS notification focuses this tab; the in-app overlay
- *      then appears automatically because the queue persists in state.
- *
- * 2. BroadcastChannel API
- *    Synchronises overlay state across multiple IT dashboard tabs open
- *    in the SAME browser. If the IT user has the dashboard open in two
- *    tabs, both will show the overlay even if only one tab's socket fires.
- *
- * OVERLAY PERSISTENCE:
- *    overlayQueue is kept in state — items are never auto-dismissed.
- *    If the user is on Gmail and the OS notification fires, when they
- *    click it and return to this tab the overlay is still queued and
- *    renders immediately. Only "Dismiss" or "Acknowledge Now" removes it.
- *
- * NOTIFICATION BELL:
- *    Uses the same NotifPanel + useNotifStore as PPC/PM dashboards.
+ * CHANGES FROM PREVIOUS VERSION:
+ * 1. NotifPanel replaced with ITNotifPanel (white/light theme)
+ * 2. registerPushSubscription() called when notification permission is granted
+ *    → registers service worker + subscribes device to Web Push
+ *    → server can now send OS-level push notifications (visible over other apps)
+ * 3. unregisterPushSubscription() called on logout
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -38,11 +18,13 @@ import api              from "../api/axios.js";
 
 import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
-import NotifPanel        from "../components/common/NotifPanel.jsx";
+import ITNotifPanel      from "../components/common/ITNotifPanel.jsx"; // WHITE THEME
 import {
   requestNotificationPermission,
   getNotificationPermission,
   triggerAlert,
+  registerPushSubscription,       // NEW — registers SW + subscribes to Web Push
+  unregisterPushSubscription,     // NEW — cleans up on logout
 } from "../utils/itNotifications.js";
 
 import "../styles/it.css";
@@ -151,15 +133,8 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
 }
 
 /* ─── Persistent Overlay Notification Card ───────────────────────────────── */
-/**
- * This overlay renders OVER everything on the IT tab.
- * It is intentionally not dismissible by clicking outside — the user
- * must either "Dismiss" (defers to queue) or "Acknowledge Now".
- * When the user comes back from another tab (having clicked the OS
- * notification), this is still in the queue and renders immediately.
- */
 function OverlayNotif({ notif, queueLength, onAck, onClose }) {
-  const isCampaign = notif.type === "campaign";
+  const isCampaign  = notif.type === "campaign";
   const accentColor = isCampaign ? "var(--accent)" : "var(--info)";
   const accentBg    = isCampaign ? "var(--accent-lt)" : "var(--info-lt)";
 
@@ -182,7 +157,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
         @keyframes itCardIn     { from { opacity:0; transform:translateY(24px) scale(0.96) } to { opacity:1; transform:none } }
         @keyframes itPulseRing  { 0%{transform:scale(1);opacity:.9} 70%{transform:scale(1.7);opacity:0} 100%{transform:scale(1.7);opacity:0} }
         @keyframes itBounceIn   { 0%{transform:scale(.3)} 50%{transform:scale(1.07)} 70%{transform:scale(.96)} 100%{transform:scale(1)} }
-        @keyframes itShake      { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-4px)} 40%{transform:translateX(4px)} 60%{transform:translateX(-3px)} 80%{transform:translateX(3px)} }
       `}</style>
 
       <div style={{
@@ -212,7 +186,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
           alignItems: "flex-start",
           gap:        16,
         }}>
-          {/* Animated icon */}
           <div style={{ position:"relative", flexShrink:0 }}>
             <div style={{
               position:"absolute", inset:0, borderRadius:"50%",
@@ -264,7 +237,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
 
         {/* Body */}
         <div style={{ padding:"20px 28px" }}>
-          {/* Message */}
           <div style={{
             padding:"13px 16px",
             background:"var(--surface3)", border:"1px solid var(--border)",
@@ -284,7 +256,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
             </p>
           </div>
 
-          {/* Schedule pill */}
           {isCampaign && notif.item?.scheduleAt && (
             <div style={{
               display:"flex", alignItems:"center", gap:9,
@@ -312,7 +283,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
             </div>
           )}
 
-          {/* Warning */}
           <div style={{
             display:"flex", gap:10, alignItems:"flex-start",
             padding:"10px 14px",
@@ -325,7 +295,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
             </p>
           </div>
 
-          {/* Actions */}
           <div style={{ display:"flex", gap:10 }}>
             <button
               onClick={onClose}
@@ -362,7 +331,6 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
           </div>
         </div>
 
-        {/* Footer */}
         <div style={{
           padding:"10px 28px",
           background:"var(--surface2)", borderTop:"1px solid var(--border)",
@@ -393,11 +361,17 @@ export default function ITDashboard() {
   const unread          = useNotifStore(s => s.unread);
   const markRead        = useNotifStore(s => s.markRead);
 
-  const handleLogout = useLogout();
+  const _handleLogout = useLogout();
+
+  // Extended logout: unregister push subscription before navigating away
+  const handleLogout = useCallback(async () => {
+    await unregisterPushSubscription().catch(() => {});
+    _handleLogout();
+  }, [_handleLogout]);
 
   const [activeSection, setActiveSection] = useState("campaigns");
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
-  const [showNotifs,    setShowNotifs]    = useState(false);   // ← NotifPanel toggle
+  const [showNotifs,    setShowNotifs]    = useState(false);
   const [ackTarget,     setAckTarget]     = useState(null);
   const [ackLoading,    setAckLoading]    = useState(false);
   const [dailyTasks,    setDailyTasks]    = useState([]);
@@ -406,34 +380,39 @@ export default function ITDashboard() {
   const [taskFetching,  setTaskFetching]  = useState(false);
   const [toasts,        setToasts]        = useState([]);
   const [refreshing,    setRefreshing]    = useState(false);
+  const [overlayQueue,  setOverlayQueue]  = useState([]);
 
-  /**
-   * overlayQueue — items are only removed by explicit user action
-   * (Dismiss or Acknowledge Now). This means if the user is on another
-   * tab when the OS notification fires, clicking it returns them to this
-   * tab where the overlay is still queued and renders immediately.
-   */
-  const [overlayQueue, setOverlayQueue] = useState([]);
-
-  // ── Notification permission state ─────────────────────────────────────────
+  // ── Notification permission ────────────────────────────────────────────────
   const [notifPermission, setNotifPermission] = useState(() =>
     getNotificationPermission()
   );
+
+  /**
+   * NEW — register push subscription whenever permission becomes "granted".
+   * This registers the service worker (sw.js) and sends the PushSubscription
+   * to the backend so the server can deliver OS-level push notifications.
+   */
+  useEffect(() => {
+    if (notifPermission === "granted") {
+      registerPushSubscription().catch(err =>
+        console.warn("[Push] Registration failed:", err.message)
+      );
+    }
+  }, [notifPermission]);
 
   // ── Close NotifPanel on outside click ─────────────────────────────────────
   const notifBellRef = useRef(null);
   useEffect(() => {
     if (!showNotifs) return;
-    const handler = (e) => {
-      if (notifBellRef.current && !notifBellRef.current.contains(e.target)) {
+    const handler = e => {
+      if (notifBellRef.current && !notifBellRef.current.contains(e.target))
         setShowNotifs(false);
-      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [showNotifs]);
 
-  // ── BroadcastChannel for cross-tab overlay sync ────────────────────────────
+  // ── BroadcastChannel — sync overlay across multiple IT tabs ───────────────
   const bcRef = useRef(null);
   useEffect(() => {
     if (!("BroadcastChannel" in window)) return;
@@ -458,21 +437,11 @@ export default function ITDashboard() {
     setNotifPermission(granted ? "granted" : "denied");
   }, []);
 
-  // ── Push overlay (persists until user action) ──────────────────────────────
+  // ── Push overlay helper ────────────────────────────────────────────────────
   const pushOverlay = useCallback((notif) => {
     const entry = { ...notif, id: Date.now() + Math.random() };
-
-    // OS-level notification — visible above ALL apps/tabs
-    triggerAlert(
-      entry.title,
-      entry.body,
-      () => { try { window.focus(); } catch (_) {} },
-    );
-
-    // In-app overlay queue (persists when returning from another tab)
+    triggerAlert(entry.title, entry.body, () => { try { window.focus(); } catch (_) {} });
     setOverlayQueue(prev => [...prev, entry]);
-
-    // Broadcast to other IT tabs in same browser
     bcRef.current?.postMessage({ type: "overlay_push", notif: entry });
   }, []);
 
@@ -486,7 +455,7 @@ export default function ITDashboard() {
     else if (notif.type === "task") setTaskAckTarget(notif.item);
   }, [dismissOverlay]);
 
-  // ── Reactive now state ─────────────────────────────────────────────────────
+  // ── Reactive now (schedule lock) ───────────────────────────────────────────
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const currentReal = Date.now();
@@ -528,12 +497,6 @@ export default function ITDashboard() {
 
   // ── Socket handlers ────────────────────────────────────────────────────────
   useSocket({
-    /**
-     * campaign:it_queued fires in two cases:
-     *   (A) PM approves with a past/no schedule → immediate delivery
-     *   (B) Server-side timer fires for a future-scheduled campaign
-     * In both cases, IT receives the overlay + OS notification.
-     */
     "campaign:it_queued": c => {
       useCampaignStore.setState(s => {
         const exists = s.campaigns.some(x => x._id === c._id);
@@ -662,11 +625,10 @@ export default function ITDashboard() {
 
   // ── Nav ────────────────────────────────────────────────────────────────────
   const NAV_ITEMS = [
-    { id:"campaigns",      label:"Campaigns",      icon:"📋", count: pendingCount     },
+    { id:"campaigns",      label:"Campaigns",      icon:"📋", count: pendingCount      },
     { id:"schedule-tasks", label:"Schedule Tasks", icon:"🗓", count: dailyTasks.length },
   ];
 
-  // Combined pending count for bell badge
   const totalPending = pendingCount + dailyTasks.length;
 
   return (
@@ -743,7 +705,7 @@ export default function ITDashboard() {
               : `${dailyTasks.length} Due`}
           </span>
 
-          {/* ── Notification Bell — matches PPC/PM style ── */}
+          {/* ── Notification Bell with WHITE ITNotifPanel ── */}
           <div style={{ position:"relative" }} ref={notifBellRef}>
             <button
               onClick={() => {
@@ -763,19 +725,18 @@ export default function ITDashboard() {
               }}
               onMouseEnter={e => {
                 if (!showNotifs) {
-                  e.currentTarget.style.borderColor  = "var(--border2)";
-                  e.currentTarget.style.background   = "var(--surface2)";
+                  e.currentTarget.style.borderColor = "var(--border2)";
+                  e.currentTarget.style.background  = "var(--surface2)";
                 }
               }}
               onMouseLeave={e => {
                 if (!showNotifs) {
-                  e.currentTarget.style.borderColor  = "var(--border)";
-                  e.currentTarget.style.background   = "var(--surface)";
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.background  = "var(--surface)";
                 }
               }}
               aria-label="Notifications"
             >
-              {/* Bell icon */}
               <svg
                 width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke={showNotifs ? "var(--accent)" : "var(--muted)"}
@@ -788,7 +749,7 @@ export default function ITDashboard() {
               {unread > 0 && (
                 <span style={{
                   position:   "absolute",
-                  top:        -4, right: -4,
+                  top: -4, right: -4,
                   minWidth:   16, height: 16,
                   borderRadius: 99,
                   background: "var(--danger)",
@@ -806,22 +767,20 @@ export default function ITDashboard() {
                 </span>
               )}
 
-              {/* Overlay queue indicator */}
               {overlayQueue.length > 0 && unread === 0 && (
                 <span style={{
                   position:   "absolute",
-                  top:        -4, right: -4,
-                  width:      10, height: 10,
+                  top: -4, right: -4,
+                  width: 10, height: 10,
                   borderRadius: "50%",
                   background: "var(--warn)",
                   border:     "2px solid var(--bg)",
-                  animation:  "itPulseRing 1.4s ease-out infinite",
                 }}/>
               )}
             </button>
 
-            {/* NotifPanel — same component as PPC/PM dashboards */}
-            <NotifPanel
+            {/* WHITE-THEMED notification panel */}
+            <ITNotifPanel
               open={showNotifs}
               onClose={() => setShowNotifs(false)}
               width={310}
@@ -999,12 +958,7 @@ export default function ITDashboard() {
         />
       )}
 
-      {/**
-       * Persistent overlay notification (topmost in queue).
-       * Survives tab switches — when the user returns from Gmail (or any
-       * other app) after clicking the OS notification, this is still here.
-       * Only removed by "Dismiss (handle later)" or "Acknowledge Now".
-       */}
+      {/* Persistent overlay — survives tab switches */}
       {currentOverlay && (
         <OverlayNotif
           notif={currentOverlay}
@@ -1014,7 +968,7 @@ export default function ITDashboard() {
         />
       )}
 
-      {/* ── Toast strip ── */}
+      {/* ── Toasts ── */}
       <div className="toast-container">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.type === "warn" ? "warn" : ""}`}>
