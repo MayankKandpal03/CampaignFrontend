@@ -620,7 +620,7 @@ export default function ITDashboard() {
       });
       const finalMessage = itMessage
         ? `${itMessage}\n\nDone at ${doneAt}`
-        : `Done at ${doneAt}`;
+        : `at ${doneAt} by ${user}`;
       await updateCampaign(ackTarget._id, { acknowledgement, itMessage: finalMessage });
       if (acknowledgement === "done") {
         addNotification(`✅ Campaign "${ackTarget.message?.slice(0,30)}…" marked Done by ${user}`);
