@@ -1,20 +1,21 @@
 // src/pages/ITDashboard.jsx
 /**
- * FIXES:
- *  1. LOGOUT: Was calling `logout` directly (from useAuthStore) with no
- *     navigation, so the user stayed on the protected page. Now uses the
- *     shared `useLogout` hook which calls logout() then navigate("/login"),
- *     matching PPCDashboard / ManagerDashboard.
+ * FIXES applied in this version:
+ *  1. LOGOUT: Uses useLogout hook (logout + navigate).
+ *  2. SCHEDULED CAMPAIGNS: Reactive `now` state + justFired check.
+ *  3. Daily tasks fetched on mount.
  *
- *  2. SCHEDULED CAMPAIGNS NOT APPEARING: `itCampaigns` was filtered with a
- *     plain `const now = Date.now()` — a constant captured at render time.
- *     Future-scheduled campaigns would never flip to visible until an external
- *     re-render happened. Now uses the same reactive `now` state + smart
- *     setTimeout pattern as PPCDashboard / CampaignsTable, including the
- *     PATH B justFired check for the campaign:schedule_fired socket event.
- *
- *  3. Daily tasks are still fetched on MOUNT so the nav badge and section
- *     are populated immediately without a loading flash.
+ * NEW — Overlay Notification System (IT only):
+ *  When a new campaign (campaign:it_queued) or daily task (dailytask:queued)
+ *  arrives via socket:
+ *    a) A three-tone chime plays via Web Audio API.
+ *    b) A native OS-level browser notification appears above ALL applications,
+ *       even when the user is on a different tab or another app entirely.
+ *       It uses `requireInteraction: true` so it persists until dismissed.
+ *    c) An in-app full-screen overlay card appears on top of the dashboard
+ *       (z-index 99999) and blocks interaction until the user either
+ *       Acknowledges or Dismisses it.
+ *  Multiple notifications queue up — each must be dismissed individually.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 
@@ -27,6 +28,10 @@ import api              from "../api/axios.js";
 
 import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
+import {
+  requestNotificationPermission,
+  triggerAlert,
+} from "../utils/itNotifications.js";
 
 import "../styles/it.css";
 
@@ -84,6 +89,312 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
   );
 }
 
+/* ─── Overlay Notification Card ──────────────────────────────────────────── */
+/**
+ * Full-screen overlay that intercepts all user interaction until dismissed.
+ * Renders above every element in the app (z-index 99999).
+ *
+ * Props:
+ *  notif   — { id, type:"campaign"|"task", title, body, item }
+ *  onAck   — user clicked "Acknowledge Now" (opens ack modal)
+ *  onClose — user clicked "Dismiss"
+ */
+function OverlayNotif({ notif, onAck, onClose }) {
+  const isCampaign = notif.type === "campaign";
+
+  return (
+    <div
+      style={{
+        position:        "fixed",
+        inset:           0,
+        zIndex:          99999,
+        background:      "rgba(18, 17, 12, 0.82)",
+        backdropFilter:  "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        display:         "flex",
+        alignItems:      "center",
+        justifyContent:  "center",
+        padding:         24,
+        animation:       "itOverlayIn 0.3s cubic-bezier(.22,1,.36,1) both",
+      }}
+    >
+      <style>{`
+        @keyframes itOverlayIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        @keyframes itCardIn {
+          from { opacity: 0; transform: translateY(24px) scale(0.96); }
+          to   { opacity: 1; transform: none; }
+        }
+        @keyframes itPulseRing {
+          0%   { transform: scale(1);   opacity: 0.9; }
+          70%  { transform: scale(1.7); opacity: 0;   }
+          100% { transform: scale(1.7); opacity: 0;   }
+        }
+        @keyframes itBounceIn {
+          0%   { transform: scale(0.3); }
+          50%  { transform: scale(1.07); }
+          70%  { transform: scale(0.96); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+
+      <div
+        style={{
+          width:        "100%",
+          maxWidth:     480,
+          background:   "var(--surface)",
+          border:       `1px solid ${isCampaign ? "rgba(42,96,72,0.35)" : "rgba(26,79,110,0.35)"}`,
+          borderRadius: 20,
+          overflow:     "hidden",
+          boxShadow:    isCampaign
+            ? "0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(42,96,72,0.15), 0 0 60px rgba(42,96,72,0.08)"
+            : "0 32px 80px rgba(0,0,0,0.55), 0 0 0 1px rgba(26,79,110,0.15), 0 0 60px rgba(26,79,110,0.08)",
+          animation:    "itCardIn 0.35s cubic-bezier(.22,1,.36,1) both",
+        }}
+      >
+        {/* ── Coloured top bar ── */}
+        <div style={{
+          height:     4,
+          background: isCampaign
+            ? "linear-gradient(90deg, var(--accent), #3a7a5a)"
+            : "linear-gradient(90deg, var(--info), #2a6a8e)",
+        }}/>
+
+        {/* ── Header ── */}
+        <div style={{
+          padding:       "28px 28px 20px",
+          background:    "var(--surface2)",
+          borderBottom:  "1px solid var(--border)",
+          display:       "flex",
+          alignItems:    "flex-start",
+          gap:           18,
+        }}>
+          {/* Pulsing icon */}
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <div style={{
+              position:      "absolute",
+              inset:         0,
+              borderRadius:  "50%",
+              background:    isCampaign ? "var(--accent-lt)" : "var(--info-lt)",
+              animation:     "itPulseRing 1.6s ease-out infinite",
+            }}/>
+            <div style={{
+              width:           52,
+              height:          52,
+              borderRadius:    "50%",
+              background:      isCampaign ? "var(--accent-lt)" : "var(--info-lt)",
+              border:          `2px solid ${isCampaign ? "var(--accent)" : "var(--info)"}`,
+              display:         "flex",
+              alignItems:      "center",
+              justifyContent:  "center",
+              fontSize:        24,
+              position:        "relative",
+              animation:       "itBounceIn 0.5s cubic-bezier(.22,1,.36,1) 0.1s both",
+            }}>
+              {isCampaign ? "📋" : "🗓"}
+            </div>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Eyebrow */}
+            <p style={{
+              margin:        "0 0 5px",
+              fontSize:      10,
+              fontFamily:    "var(--ff-mono)",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color:         isCampaign ? "var(--accent)" : "var(--info)",
+              fontWeight:    600,
+            }}>
+              {isCampaign ? "New Campaign Assigned" : "Daily Task Due"}
+            </p>
+            <h2 style={{
+              margin:        "0 0 4px",
+              fontSize:      20,
+              fontWeight:    700,
+              color:         "var(--text)",
+              fontFamily:    "var(--ff-display)",
+              letterSpacing: "-0.02em",
+              lineHeight:    1.2,
+            }}>
+              {notif.title}
+            </h2>
+            <p style={{
+              margin:   0,
+              fontSize: 12,
+              color:    "var(--muted)",
+              fontFamily: "var(--ff-mono)",
+            }}>
+              Received at {new Date().toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true })}
+            </p>
+          </div>
+        </div>
+
+        {/* ── Body ── */}
+        <div style={{ padding: "20px 28px" }}>
+          {/* Message / Task content */}
+          <div style={{
+            padding:      "14px 16px",
+            background:   "var(--surface3)",
+            border:       "1px solid var(--border)",
+            borderRadius: 10,
+            marginBottom: 16,
+          }}>
+            <p style={{
+              margin:      0,
+              fontSize:    8,
+              fontFamily:  "var(--ff-mono)",
+              letterSpacing:"0.1em",
+              textTransform:"uppercase",
+              color:       "var(--muted)",
+              marginBottom: 7,
+            }}>
+              {isCampaign ? "PM Note / Message" : "Task Description"}
+            </p>
+            <p style={{
+              margin:     0,
+              fontSize:   14,
+              color:      "var(--ink)",
+              lineHeight: 1.65,
+              wordBreak:  "break-word",
+              fontFamily: "var(--ff-body)",
+            }}>
+              {notif.body || "—"}
+            </p>
+          </div>
+
+          {/* Scheduled time (campaigns) */}
+          {isCampaign && notif.item?.scheduleAt && (
+            <div style={{
+              display:      "flex",
+              alignItems:   "center",
+              gap:          8,
+              padding:      "10px 14px",
+              background:   "var(--accent-lt)",
+              borderRadius: 8,
+              marginBottom: 16,
+            }}>
+              <span style={{ fontSize: 14 }}>🕐</span>
+              <div>
+                <p style={{ margin:0, fontSize:10, fontFamily:"var(--ff-mono)", color:"var(--accent)", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:2 }}>Scheduled At</p>
+                <p style={{ margin:0, fontSize:12, fontFamily:"var(--ff-mono)", color:"var(--accent)", fontWeight:600 }}>{fmt(notif.item.scheduleAt)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Daily task time */}
+          {!isCampaign && notif.item?.time && (
+            <div style={{
+              display:      "flex",
+              alignItems:   "center",
+              gap:          8,
+              padding:      "10px 14px",
+              background:   "var(--info-lt)",
+              borderRadius: 8,
+              marginBottom: 16,
+            }}>
+              <span style={{ fontSize: 14 }}>⏰</span>
+              <div>
+                <p style={{ margin:0, fontSize:10, fontFamily:"var(--ff-mono)", color:"var(--info)", letterSpacing:"0.08em", textTransform:"uppercase", marginBottom:2 }}>Scheduled Daily At</p>
+                <p style={{ margin:0, fontSize:12, fontFamily:"var(--ff-mono)", color:"var(--info)", fontWeight:600 }}>{notif.item.time} IST</p>
+              </div>
+            </div>
+          )}
+
+          {/* Attention banner */}
+          <div style={{
+            display:      "flex",
+            alignItems:   "center",
+            gap:          8,
+            padding:      "10px 14px",
+            background:   "rgba(143,66,12,0.08)",
+            border:       "1px solid rgba(143,66,12,0.2)",
+            borderRadius: 8,
+            marginBottom: 20,
+          }}>
+            <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+            <p style={{ margin:0, fontSize:12, color:"var(--warn)", lineHeight:1.5, fontFamily:"var(--ff-body)" }}>
+              This notification requires your attention. Acknowledge to confirm receipt, or dismiss to handle it later from the queue.
+            </p>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={onClose}
+              style={{
+                flex:         1,
+                padding:      "12px",
+                borderRadius: 10,
+                border:       "1.5px solid var(--border2)",
+                background:   "none",
+                fontFamily:   "var(--ff-body)",
+                fontSize:     13,
+                fontWeight:   500,
+                color:        "var(--muted)",
+                cursor:       "pointer",
+                transition:   "all 0.15s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--border2)"; e.currentTarget.style.color = "var(--ink)"; e.currentTarget.style.background = "var(--surface2)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border2)"; e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "none"; }}
+            >
+              Dismiss
+            </button>
+
+            <button
+              onClick={() => onAck(notif)}
+              style={{
+                flex:         2,
+                padding:      "12px",
+                borderRadius: 10,
+                border:       "1.5px solid transparent",
+                background:   isCampaign
+                  ? "linear-gradient(135deg, var(--accent), #3a7a5a)"
+                  : "linear-gradient(135deg, var(--info), #2a6a8e)",
+                fontFamily:   "var(--ff-body)",
+                fontSize:     14,
+                fontWeight:   600,
+                color:        "#fff",
+                cursor:       "pointer",
+                display:      "flex",
+                alignItems:   "center",
+                justifyContent: "center",
+                gap:          8,
+                boxShadow:    isCampaign
+                  ? "0 4px 16px rgba(42,96,72,0.25)"
+                  : "0 4px 16px rgba(26,79,110,0.25)",
+                transition:   "all 0.15s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.9"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "none"; }}
+            >
+              <span>✓</span>
+              Acknowledge Now
+            </button>
+          </div>
+        </div>
+
+        {/* ── Footer ── */}
+        <div style={{
+          padding:      "12px 28px",
+          background:   "var(--surface2)",
+          borderTop:    "1px solid var(--border)",
+          display:      "flex",
+          alignItems:   "center",
+          gap:          6,
+        }}>
+          <span style={{ width:6, height:6, borderRadius:"50%", background:"var(--accent)", animation:"itPulseRing 1.6s ease-out infinite", flexShrink:0 }}/>
+          <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
+            IT Portal · Campaign Management System
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export default function ITDashboard() {
   const campaigns      = useCampaignStore(s => s.campaigns);
@@ -93,7 +404,6 @@ export default function ITDashboard() {
   const addNotification = useNotifStore(s => s.addNotification);
   const unread          = useNotifStore(s => s.unread);
 
-  // FIX 1: Use useLogout so logout navigates to /login.
   const handleLogout = useLogout();
 
   const [activeSection, setActiveSection] = useState("campaigns");
@@ -110,27 +420,67 @@ export default function ITDashboard() {
   const [toasts,     setToasts]     = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  // FIX 2: Reactive now state — same pattern as PPCDashboard / CampaignsTable.
-  // A plain `Date.now()` constant means future-scheduled campaigns never appear
-  // until an external re-render happens.
+  // ── Overlay notification queue ─────────────────────────────────────────────
+  // Each entry: { id, type:"campaign"|"task", title, body, item }
+  const [overlayQueue, setOverlayQueue] = useState([]);
+
+  // The topmost (first) overlay is shown; others queue behind it.
+  const currentOverlay = overlayQueue[0] ?? null;
+
+  // ── Request notification permission on mount ──────────────────────────────
+  useEffect(() => {
+    requestNotificationPermission().then(granted => {
+      if (!granted) {
+        console.info("[ITNotif] Native notifications not granted — in-app overlay only.");
+      }
+    });
+  }, []);
+
+  // ── Push a new overlay notification ──────────────────────────────────────
+  const pushOverlay = useCallback((notif) => {
+    const id = Date.now() + Math.random();
+
+    // Focus the window/tab (Chrome supports this; other browsers may ignore it)
+    try { window.focus(); } catch (_) {}
+
+    // Sound + native OS notification
+    triggerAlert(
+      notif.title,
+      notif.body,
+      // onClick: bring user back to tab
+      () => { try { window.focus(); } catch (_) {} },
+    );
+
+    setOverlayQueue(prev => [...prev, { ...notif, id }]);
+  }, []);
+
+  // ── Dismiss top overlay ───────────────────────────────────────────────────
+  const dismissOverlay = useCallback(() => {
+    setOverlayQueue(prev => prev.slice(1));
+  }, []);
+
+  // ── Acknowledge from overlay (opens ack modal, dismisses overlay) ─────────
+  const ackFromOverlay = useCallback((notif) => {
+    dismissOverlay();
+    if (notif.type === "campaign") {
+      setAckTarget(notif.item);
+    } else if (notif.type === "task") {
+      setTaskAckTarget(notif.item);
+    }
+  }, [dismissOverlay]);
+
+  // ── Reactive now state — zero-polling schedule lock ───────────────────────
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     const currentReal = Date.now();
-
-    // PATH B: campaign:schedule_fired patched the store, scheduleAt crossed
-    // from future (per stale `now`) to past (in real time). Update immediately.
     const justFired = campaigns.some(c =>
       c.scheduleAt &&
       new Date(c.scheduleAt).getTime() > now &&
       new Date(c.scheduleAt).getTime() <= currentReal
     );
-    if (justFired) {
-      setNow(currentReal);
-      return;
-    }
+    if (justFired) { setNow(currentReal); return; }
 
-    // PATH A: schedule a timeout for the nearest upcoming scheduleAt.
     const nextTime = campaigns
       .filter(c => c.scheduleAt)
       .map(c => new Date(c.scheduleAt).getTime())
@@ -143,7 +493,7 @@ export default function ITDashboard() {
     return () => clearTimeout(id);
   }, [campaigns, now]);
 
-  // Fetch daily tasks on mount so nav badge and section are immediately populated.
+  // ── Fetch daily tasks on mount ────────────────────────────────────────────
   const fetchDueTasks = useCallback(async () => {
     setTaskFetching(true);
     try {
@@ -161,45 +511,68 @@ export default function ITDashboard() {
     fetchDueTasks();
   }, [getCampaign, fetchDueTasks]);
 
-  // Socket handlers
+  // ── Socket handlers ───────────────────────────────────────────────────────
   useSocket({
     "campaign:it_queued": c => {
       useCampaignStore.setState(s => {
         const exists = s.campaigns.some(x => x._id === c._id);
         return { campaigns: exists ? s.campaigns.map(x => x._id===c._id ? c : x) : [c,...s.campaigns] };
       });
-      addNotification(`📋 New campaign in queue: "${c.message?.slice(0,40)}${c.message?.length>40?"…":""}"`);
+
+      const msgPreview = (c.pmMessage || c.message || "New campaign assigned").slice(0, 120);
+      addNotification(`📋 New campaign in queue: "${msgPreview}${msgPreview.length >= 120 ? "…" : ""}"`);
+
+      // ── Overlay + sound + native notification ──
+      pushOverlay({
+        type:  "campaign",
+        title: "New Campaign Assigned",
+        body:  c.pmMessage || c.message?.slice(0, 200) || "A new campaign requires your acknowledgement.",
+        item:  c,
+      });
     },
+
     "campaign:updated": c => {
       useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id===c._id ? c : x) }));
     },
+
     "campaign:it_ack": c => {
       useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id===c._id ? c : x) }));
     },
+
     "campaign:deleted": d => {
       useCampaignStore.setState(s => ({ campaigns: s.campaigns.filter(x => x._id !== d._id) }));
     },
-    // Patch the store so the justFired check in the now-state effect fires.
+
     "campaign:schedule_fired": c => {
       useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id===c._id ? c : x) }));
     },
+
     "dailytask:queued": task => {
       setDailyTasks(prev => {
         const exists = prev.some(t => t._id === task._id);
         return exists ? prev : [task, ...prev];
       });
-      addNotification(`🗓 Daily task due: "${task.task?.slice(0,40)}${task.task?.length>40?"…":""}"`);
-      pushToast(`Daily task arrived: "${task.task?.slice(0,40)}${task.task?.length>40?"…":""}"`);
+
+      const taskPreview = (task.task || "Daily task needs acknowledgement").slice(0, 100);
+      addNotification(`🗓 Daily task due: "${taskPreview}${taskPreview.length >= 100 ? "…" : ""}"`);
+
+      // ── Overlay + sound + native notification ──
+      pushOverlay({
+        type:  "task",
+        title: "Daily Task Due Now",
+        body:  task.task?.slice(0, 200) || "A scheduled daily task requires your acknowledgement.",
+        item:  task,
+      });
     },
   });
 
-  // 60-second auto-refresh as a belt-and-suspenders fallback.
+  // ── 60-second auto-refresh fallback ──────────────────────────────────────
   useEffect(() => {
     const id = setInterval(() => getCampaign().catch(console.error), 60_000);
     return () => clearInterval(id);
   }, [getCampaign]);
 
-  // Derived campaign list — depends on reactive `now`, not inline Date.now().
+  // ── Derived campaign list ─────────────────────────────────────────────────
   const itCampaigns = useMemo(() => campaigns.filter(c => {
     if (c.action !== "approve") return false;
     if (c.status  === "cancel") return false;
@@ -211,6 +584,7 @@ export default function ITDashboard() {
   const doneCount    = useMemo(() => campaigns.filter(c => c.acknowledgement === "done").length, [campaigns]);
   const pendingCount = itCampaigns.length;
 
+  // ── Toast helpers ─────────────────────────────────────────────────────────
   const pushToast = useCallback((msg, type = "success") => {
     const id = Date.now();
     setToasts(p => [...p, { id, msg, type }]);
@@ -224,12 +598,18 @@ export default function ITDashboard() {
     pushToast("Campaigns refreshed");
   };
 
+  // ── Campaign acknowledge ──────────────────────────────────────────────────
   const handleAck = async ({ acknowledgement, itMessage }) => {
     if (!ackTarget) return;
     setAckLoading(true);
     try {
-      const doneAt = new Date().toLocaleString("en-IN", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:false });
-      const finalMessage = itMessage ? `${itMessage}\n\nDone at ${doneAt}` : `Done at ${doneAt}`;
+      const doneAt = new Date().toLocaleString("en-IN", {
+        day:"2-digit", month:"2-digit", year:"numeric",
+        hour:"2-digit", minute:"2-digit", hour12:false,
+      });
+      const finalMessage = itMessage
+        ? `${itMessage}\n\nDone at ${doneAt}`
+        : `Done at ${doneAt}`;
       await updateCampaign(ackTarget._id, { acknowledgement, itMessage: finalMessage });
       if (acknowledgement === "done") {
         addNotification(`✅ IT: Campaign "${ackTarget.message?.slice(0,30)}…" marked Done by ${user}`);
@@ -244,6 +624,7 @@ export default function ITDashboard() {
     } finally { setAckLoading(false); }
   };
 
+  // ── Daily task acknowledge ────────────────────────────────────────────────
   const handleTaskAck = async (taskId, message) => {
     setTaskAckLoading(true);
     try {
@@ -257,6 +638,7 @@ export default function ITDashboard() {
     } finally { setTaskAckLoading(false); }
   };
 
+  // ── Nav ───────────────────────────────────────────────────────────────────
   const NAV_ITEMS = [
     { id:"campaigns",      label:"Campaigns",      icon:"📋", count: pendingCount     },
     { id:"schedule-tasks", label:"Schedule Tasks", icon:"🗓", count: dailyTasks.length },
@@ -281,12 +663,18 @@ export default function ITDashboard() {
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
-            <button key={item.id} className={`nav-item ${activeSection===item.id ? "active" : ""}`}
+            <button key={item.id}
+              className={`nav-item ${activeSection===item.id ? "active" : ""}`}
               onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}>
               <span className="nav-icon">{item.icon}</span>
               <span style={{ flex:1 }}>{item.label}</span>
               {item.count > 0 && (
-                <span style={{ padding:"1px 7px", borderRadius:99, background: activeSection===item.id ? "var(--accent)" : "var(--surface3)", color: activeSection===item.id ? "#fff" : "var(--muted)", fontSize:10, fontFamily:"var(--ff-mono)", fontWeight:700 }}>
+                <span style={{
+                  padding:"1px 7px", borderRadius:99,
+                  background: activeSection===item.id ? "var(--accent)" : "var(--surface3)",
+                  color: activeSection===item.id ? "#fff" : "var(--muted)",
+                  fontSize:10, fontFamily:"var(--ff-mono)", fontWeight:700,
+                }}>
                   {item.count}
                 </span>
               )}
@@ -294,7 +682,6 @@ export default function ITDashboard() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          {/* FIX: was calling logout() directly with no navigation */}
           <button className="logout-btn" onClick={handleLogout}><span>↩</span> Sign Out</button>
         </div>
       </aside>
@@ -311,10 +698,40 @@ export default function ITDashboard() {
           <span className="header-badge">
             {activeSection === "campaigns" ? `${pendingCount} Pending` : `${dailyTasks.length} Due`}
           </span>
-          <div className="notif-bell" title={`${unread} unread notifications`}
-            onClick={() => pushToast(`You have ${unread} notification(s)`)}>
-            🔔
-            {unread > 0 && <span className="notif-dot"/>}
+
+          {/* Notification bell with pending-overlay count */}
+          <div style={{ position:"relative" }}>
+            <div
+              className="notif-bell"
+              title={`${unread} unread notifications`}
+              onClick={() => pushToast(`You have ${unread} notification(s)`)}
+            >
+              🔔
+              {unread > 0 && <span className="notif-dot"/>}
+            </div>
+            {/* Overlay queue count badge */}
+            {overlayQueue.length > 0 && (
+              <span style={{
+                position:      "absolute",
+                top:           -6,
+                right:         -6,
+                minWidth:      18,
+                height:        18,
+                borderRadius:  99,
+                background:    "var(--danger)",
+                color:         "#fff",
+                fontSize:      10,
+                fontFamily:    "var(--ff-mono)",
+                fontWeight:    700,
+                display:       "flex",
+                alignItems:    "center",
+                justifyContent:"center",
+                padding:       "0 4px",
+                border:        "2px solid var(--bg)",
+              }}>
+                {overlayQueue.length}
+              </span>
+            )}
           </div>
         </header>
 
@@ -338,12 +755,14 @@ export default function ITDashboard() {
                 <div className="stat-sub">Approved by PM (all time)</div>
               </div>
             </div>
+
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Request Queue</span>
               <button className="refresh-btn" onClick={handleRefresh} disabled={refreshing}>
                 {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
+
             <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
               {itCampaigns.length === 0 ? (
                 <div className="table-empty">
@@ -397,16 +816,20 @@ export default function ITDashboard() {
                   {dailyTasks.length === 0 ? "✓ Clear" : "⏳ Pending"}
                 </div>
                 <div className="stat-sub">
-                  {dailyTasks.length === 0 ? "All tasks acknowledged for today" : `${dailyTasks.length} task(s) need attention`}
+                  {dailyTasks.length === 0
+                    ? "All tasks acknowledged for today"
+                    : `${dailyTasks.length} task(s) need attention`}
                 </div>
               </div>
             </div>
+
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Today's Task Queue</span>
               <button className="refresh-btn" onClick={fetchDueTasks} disabled={taskFetching}>
                 {taskFetching ? "⟳ Loading…" : "⟳ Refresh"}
               </button>
             </div>
+
             <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
               {taskFetching ? (
                 <div className="table-empty">
@@ -452,6 +875,7 @@ export default function ITDashboard() {
         )}
       </div>
 
+      {/* ── Ack modals ── */}
       {ackTarget && (
         <AckModal campaign={ackTarget} onClose={() => setAckTarget(null)} onConfirm={handleAck} loading={ackLoading}/>
       )}
@@ -459,6 +883,16 @@ export default function ITDashboard() {
         <TaskAckModal task={taskAckTarget} onClose={() => setTaskAckTarget(null)} onConfirm={handleTaskAck} loading={taskAckLoading}/>
       )}
 
+      {/* ── Overlay notification (topmost in queue) ── */}
+      {currentOverlay && (
+        <OverlayNotif
+          notif={currentOverlay}
+          onClose={dismissOverlay}
+          onAck={ackFromOverlay}
+        />
+      )}
+
+      {/* ── Toast strip ── */}
       <div className="toast-container">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.type==="warn" ? "warn" : ""}`}>{t.msg}</div>
