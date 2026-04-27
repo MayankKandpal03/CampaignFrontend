@@ -6,6 +6,13 @@
  *    → registers service worker + subscribes device to Web Push
  *    → server can now send OS-level push notifications (visible over other apps)
  * 3. unregisterPushSubscription() called on logout
+ *
+ * FIX — Daily task auto-update (issues vs campaign section):
+ * 4. Added 60-second periodic auto-refresh for daily tasks (same pattern as campaigns).
+ * 5. Added section-switch re-fetch: switching to "schedule-tasks" tab now
+ *    immediately re-fetches due tasks so the list is never stale.
+ * 6. Fixed dailytask:queued socket handler to use String(_id) comparison so
+ *    ObjectId vs string mismatches don't silently skip the deduplication check.
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -18,13 +25,13 @@ import api              from "../api/axios.js";
 
 import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
-import ITNotifPanel      from "../components/common/ITNotifPanel.jsx"; // WHITE THEME
+import ITNotifPanel      from "../components/common/ITNotifPanel.jsx";
 import {
   requestNotificationPermission,
   getNotificationPermission,
   triggerAlert,
-  registerPushSubscription,       // NEW — registers SW + subscribes to Web Push
-  unregisterPushSubscription,     // NEW — cleans up on logout
+  registerPushSubscription,
+  unregisterPushSubscription,
 } from "../utils/itNotifications.js";
 
 import "../styles/it.css";
@@ -387,11 +394,6 @@ export default function ITDashboard() {
     getNotificationPermission()
   );
 
-  /**
-   * NEW — register push subscription whenever permission becomes "granted".
-   * This registers the service worker (sw.js) and sends the PushSubscription
-   * to the backend so the server can deliver OS-level push notifications.
-   */
   useEffect(() => {
     if (notifPermission === "granted") {
       registerPushSubscription().catch(err =>
@@ -490,10 +492,36 @@ export default function ITDashboard() {
     }
   }, []);
 
+  // ── Initial load ───────────────────────────────────────────────────────────
   useEffect(() => {
     getCampaign().catch(console.error);
     fetchDueTasks();
   }, [getCampaign, fetchDueTasks]);
+
+  // ── 60-second auto-refresh for campaigns ──────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => getCampaign().catch(console.error), 60_000);
+    return () => clearInterval(id);
+  }, [getCampaign]);
+
+  // ── FIX: 60-second auto-refresh for daily tasks ───────────────────────────
+  // Mirrors the campaign refresh so missed socket events are caught.
+  // Without this, a task delivered while the socket was briefly disconnected
+  // would never appear until the user manually clicked Refresh.
+  useEffect(() => {
+    const id = setInterval(() => fetchDueTasks(), 60_000);
+    return () => clearInterval(id);
+  }, [fetchDueTasks]);
+
+  // ── FIX: Re-fetch daily tasks when switching to the section ───────────────
+  // Switching tabs doesn't re-mount the component, so `dailyTasks` could be
+  // stale if events arrived while the user was on the campaigns tab.
+  // A fresh fetch on section switch guarantees the list is always current.
+  useEffect(() => {
+    if (activeSection === "schedule-tasks") {
+      fetchDueTasks();
+    }
+  }, [activeSection, fetchDueTasks]);
 
   // ── Socket handlers ────────────────────────────────────────────────────────
   useSocket({
@@ -535,13 +563,17 @@ export default function ITDashboard() {
         campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
       }));
     },
+
+    // FIX: Use String() comparison so ObjectId vs string mismatches
+    // don't silently break the deduplication check and skip adding the task.
     "dailytask:queued": task => {
       setDailyTasks(prev => {
-        const exists = prev.some(t => t._id === task._id);
+        const exists = prev.some(t => String(t._id) === String(task._id));
         return exists ? prev : [task, ...prev];
       });
       const taskPreview = (task.task || "Daily task needs acknowledgement").slice(0, 100);
       addNotification(`🗓 Daily task due: "${taskPreview}${taskPreview.length >= 100 ? "…" : ""}"`);
+      // Same overlay + sound + browser push as campaigns
       pushOverlay({
         type:  "task",
         title: "Daily Task Due Now",
@@ -550,12 +582,6 @@ export default function ITDashboard() {
       });
     },
   });
-
-  // ── 60-second auto-refresh fallback ───────────────────────────────────────
-  useEffect(() => {
-    const id = setInterval(() => getCampaign().catch(console.error), 60_000);
-    return () => clearInterval(id);
-  }, [getCampaign]);
 
   // ── Derived campaign list ──────────────────────────────────────────────────
   const itCampaigns = useMemo(() => campaigns.filter(c => {
@@ -614,7 +640,7 @@ export default function ITDashboard() {
     setTaskAckLoading(true);
     try {
       await api.post("/task/acknowledge", { id: taskId, message });
-      setDailyTasks(prev => prev.filter(t => t._id !== taskId));
+      setDailyTasks(prev => prev.filter(t => String(t._id) !== String(taskId)));
       setTaskAckTarget(null);
       pushToast("Daily task acknowledged. PMs notified.");
       addNotification(`✅ Daily task acknowledged by ${user}`);
@@ -705,7 +731,7 @@ export default function ITDashboard() {
               : `${dailyTasks.length} Due`}
           </span>
 
-          {/* ── Notification Bell with WHITE ITNotifPanel ── */}
+          {/* ── Notification Bell ── */}
           <div style={{ position:"relative" }} ref={notifBellRef}>
             <button
               onClick={() => {
@@ -745,7 +771,6 @@ export default function ITDashboard() {
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
               </svg>
 
-              {/* Unread count badge */}
               {unread > 0 && (
                 <span style={{
                   position:   "absolute",
@@ -779,7 +804,6 @@ export default function ITDashboard() {
               )}
             </button>
 
-            {/* WHITE-THEMED notification panel */}
             <ITNotifPanel
               open={showNotifs}
               onClose={() => setShowNotifs(false)}

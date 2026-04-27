@@ -14,6 +14,14 @@
  * The backend socket.js middleware already checks this path first — no backend
  * changes are needed.
  *
+ * FIX — Mobile data CORS failure:
+ * `withCredentials: true` on socket polling requests sends cookies and requires
+ * the server to respond with `Access-Control-Allow-Credentials: true`. Mobile
+ * carrier proxies often strip this response header, causing the browser to
+ * reject the polling response as a CORS violation and break the connection.
+ * Since auth is entirely via `auth: { token }`, cookies are not needed for
+ * socket auth — removing `withCredentials` eliminates this failure path.
+ *
  * Stale closure fix (already present, preserved):
  * Handlers are stored in a mutable ref so the socket always calls the latest
  * version without re-registering listeners on every render.
@@ -37,8 +45,12 @@ export const useSocket = (eventHandlers = {}) => {
     const socket = io(
       import.meta.env.VITE_SOCKET_URL || "https://campaignbackend-production.up.railway.app",
       {
-        withCredentials: true,
-        // Primary auth path — works cross-origin regardless of cookie policy.
+        // NOTE: withCredentials intentionally removed.
+        // Socket auth is via auth.token — cookies are not needed here.
+        // withCredentials: true causes CORS failures on mobile carrier networks
+        // because carrier proxies strip Access-Control-Allow-Credentials from
+        // polling responses, making the browser reject them as CORS errors.
+        // The backend socket middleware checks auth.token first, so this is safe.
         auth: { token: accessToken ?? "" },
         // Start with WebSocket directly to avoid a polling round-trip that
         // can sometimes drop auth context on cross-origin proxies.
