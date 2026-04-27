@@ -5,23 +5,58 @@ const BASE_URL =
   "https://campaignbackend-production.up.railway.app/api/v1";
 
 // Create axios instance
+// NOTE: withCredentials is intentionally NOT set globally.
+// On mobile networks, carrier-level proxies often strip the
+// Access-Control-Allow-Credentials response header, which causes
+// browsers to reject cross-origin requests even when the server
+// sends the correct CORS headers.
+// Since we already persist the accessToken in localStorage and
+// inject it as a Bearer header (below), cookies are only needed
+// for the two endpoints that set/read httpOnly cookies:
+//   • /logout          (clears the refreshToken cookie on the server)
+//   • /refresh-token   (reads the refreshToken cookie to issue a new pair)
+// All other routes authenticate via the Authorization: Bearer header.
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000, // increased from 10000 — Railway free tier can be slow to wake
-  withCredentials: true,
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
 });
 
-// Request interceptor — attach token from localStorage (needed on mobile where cookies are blocked)
+// Cookie-dependent routes — only these need withCredentials
+const COOKIE_ROUTES = ["/logout", "/refresh-token"];
+
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    // Primary: explicit "token" key set by LoginPage after a successful login.
+    // Fallback: accessToken inside the persisted Zustand auth-storage entry
+    // (handles page-refresh before any new login has run).
+    let token = localStorage.getItem("token");
+
+    if (!token) {
+      try {
+        const stored = localStorage.getItem("auth-storage");
+        if (stored) {
+          token = JSON.parse(stored)?.state?.accessToken ?? null;
+        }
+      } catch {
+        // ignore parse errors — token stays null
+      }
+    }
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Only send cookies for the two endpoints that require them.
+    // This is what prevents CORS preflight failures on mobile networks.
+    if (COOKIE_ROUTES.some((r) => config.url?.endsWith(r))) {
+      config.withCredentials = true;
+    }
+
     return config;
   },
   (error) => Promise.reject(error),
@@ -31,17 +66,16 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error?.response?.status;
+    const status  = error?.response?.status;
     const message = error?.response?.data?.message;
 
-    // Log full error for debugging — remove after fixing
     console.error("[API Error]", {
-      url: error?.config?.url,
-      method: error?.config?.method,
+      url:          error?.config?.url,
+      method:       error?.config?.method,
       status,
       message,
-      errorMessage: error.message, // "Network Error", "timeout", etc.
-      code: error.code,            // "ECONNABORTED" = timeout, "ERR_NETWORK" = CORS/offline
+      errorMessage: error.message,
+      code:         error.code,
     });
 
     if (status === 401) console.error("Unauthorized — token may be expired");
