@@ -79,7 +79,7 @@ export default function DashboardSidebar({
             letterSpacing: "0.1em",
             lineHeight:    1,
           }}>
-            OPS SUITE
+            Sat Kartar
           </p>
           <p style={{
             margin:        "4px 0 0",
@@ -101,12 +101,12 @@ export default function DashboardSidebar({
       <div style={{padding:"16px 10px 10px", flex:1}}>
         <p style={{
           margin:        "0 0 8px 10px",
-          fontSize:      8,
-          color:         T.muted,
+          fontSize:      10,
+          color:         "white",
           letterSpacing: "0.22em",
           fontFamily:    "'Cinzel', serif",
           textTransform: "uppercase",
-          opacity:       0.7,
+          
         }}>
           Navigation
         </p>
@@ -182,12 +182,12 @@ export default function DashboardSidebar({
       }}>
         <p style={{
           margin:        "0 0 10px 2px",
-          fontSize:      8,
+          fontSize:      10,
           letterSpacing: "0.22em",
-          color:         T.muted,
+          color:         "white",
           fontFamily:    "'Cinzel', serif",
           textTransform: "uppercase",
-          opacity:       0.7,
+          
         }}>
           Account
         </p>

@@ -9,22 +9,6 @@
  */
 import { useState } from "react";
 
-/* IT Dashboard uses its own CSS variable theme, not the OPS SUITE token system.
-   These values mirror the --accent / --warn variables from STYLES in ITDashboard. */
-const C = {
-  surface:  "#ffffff",
-  border:   "#e6e3dc",
-  border2:  "#d0ccc3",
-  text:     "#1a1915",
-  muted:    "#8c8880",
-  accent:   "#2d6a4f",
-  accentLt: "#e8f4f0",
-  warn:     "#9b4a1b",
-  warnLt:   "#fdf0e8",
-  bg2:      "#f9f8f5",
-  input:    "#ffffff",
-};
-
 export default function AckModal({ campaign, onClose, onConfirm, loading }) {
   const [choice,  setChoice]  = useState(null);      // "done" | "not done"
   const [message, setMessage] = useState("done");

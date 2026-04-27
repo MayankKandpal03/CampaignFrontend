@@ -10,9 +10,6 @@
  *  Emitted by the server when a previously-scheduled campaign timer fires and
  *  the campaign is actually delivered to IT. PPC/Manager/PM dashboards receive
  *  this event so they patch the campaign in the store immediately.
- *  Combined with the smart-timeout `now` state in each dashboard, the edit
- *  button locks and the ticket state switches to "Sent to IT" in real-time
- *  with zero polling.
  */
 import useCampaignStore from "../stores/useCampaignStore.js";
 import { useSocket }    from "./useSocket.js";
@@ -26,7 +23,7 @@ export const useCampaigns = ({
   const createCampaign = useCampaignStore(s => s.createCampaign);
   const updateCampaign = useCampaignStore(s => s.updateCampaign);
 
-  // ── Store mutation helpers ─────────────────────────────────────────────────
+  // ── Store mutation helpers (used by socket handlers below) ────────────────
   const addCampaign = c => {
     const exists = useCampaignStore.getState().campaigns.some(x => x._id === c._id);
     if (!exists) {
@@ -64,12 +61,6 @@ export const useCampaigns = ({
             );
           },
 
-          /**
-           * campaign:schedule_fired — server timer has fired; campaign now delivered
-           * to IT. Patches the campaign so dashboards reflect "Sent to IT" and lock
-           * the edit button immediately (the `now` smart-timeout drives the visual).
-           * No notification needed — PM approval already informed the user.
-           */
           "campaign:schedule_fired": c => {
             patchCampaign(c);
           },
@@ -92,5 +83,5 @@ export const useCampaigns = ({
       : {},
   );
 
-  return { campaigns, getCampaign, createCampaign, updateCampaign, addCampaign, patchCampaign };
+  return { campaigns, getCampaign, createCampaign, updateCampaign };
 };

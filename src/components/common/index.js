@@ -7,4 +7,3 @@ export { default as Field }           from "./Field.jsx";
 export { default as RoleBadge }       from "./RoleBadge.jsx";
 export { default as NotifPanel }      from "./NotifPanel.jsx";
 export { default as OpsGlobalStyles } from "./OpsGlobalStyles.jsx";
-export { default as ErrorBoundary }   from "./ErrorBoundary.jsx";
