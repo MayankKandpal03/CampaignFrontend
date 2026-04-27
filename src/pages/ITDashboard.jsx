@@ -818,23 +818,7 @@ export default function ITDashboard() {
             className="it-content"
             style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}
           >
-            <div className="stats-row" style={{ flexShrink:0 }}>
-              <div className="stat-card">
-                <div className="stat-label">Pending Action</div>
-                <div className="stat-value">{pendingCount}</div>
-                <div className="stat-sub">Scheduled &amp; awaiting acknowledgement</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Completed</div>
-                <div className="stat-value">{doneCount}</div>
-                <div className="stat-sub">Acknowledged as done</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Total Approved</div>
-                <div className="stat-value">{campaigns.filter(c => c.action === "approve").length}</div>
-                <div className="stat-sub">Approved by PM (all time)</div>
-              </div>
-            </div>
+         
 
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Request Queue</span>
@@ -889,24 +873,7 @@ export default function ITDashboard() {
             className="it-content"
             style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}
           >
-            <div className="stats-row" style={{ gridTemplateColumns:"repeat(2,1fr)", flexShrink:0 }}>
-              <div className="stat-card">
-                <div className="stat-label">Due Now</div>
-                <div className="stat-value">{dailyTasks.length}</div>
-                <div className="stat-sub">Daily tasks awaiting acknowledgement</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Status</div>
-                <div className="stat-value" style={{ fontSize:22, color:"var(--accent)" }}>
-                  {dailyTasks.length === 0 ? "✓ Clear" : "⏳ Pending"}
-                </div>
-                <div className="stat-sub">
-                  {dailyTasks.length === 0
-                    ? "All tasks acknowledged for today"
-                    : `${dailyTasks.length} task(s) need attention`}
-                </div>
-              </div>
-            </div>
+          
 
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Today's Task Queue</span>
