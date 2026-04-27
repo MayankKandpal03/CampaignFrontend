@@ -619,7 +619,7 @@ export default function ITDashboard() {
         hour:"2-digit", minute:"2-digit", hour12:false,
       });
       const finalMessage = itMessage
-        ? `${itMessage}\n\nDone at ${doneAt}`
+        ? `${itMessage}\n\nat ${doneAt} by ${user}`
         : `at ${doneAt} by ${user}`;
       await updateCampaign(ackTarget._id, { acknowledgement, itMessage: finalMessage });
       if (acknowledgement === "done") {
