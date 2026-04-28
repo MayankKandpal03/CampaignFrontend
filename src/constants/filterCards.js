@@ -9,7 +9,7 @@ export const FILTER_CARDS = [
   { id: "not done",  label: "Not Done",   color: T.amber,  bg: T.amberBg },
 ];
 
-/** PM all-campaigns section — 5 cards */
+/** PM all-tasks section — 5 cards */
 export const PM_FILTER_CARDS = [
   { id: "pending",   label: "Pending",    color: T.amber,  bg: T.amberBg },
   { id: "approve",   label: "Approved",   color: T.teal,   bg: T.tealBg  },

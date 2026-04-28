@@ -141,7 +141,7 @@ export const showNativeNotification = (title, body, onClickCb) => {
       renotify:           true,
     });
     notif.onclick = () => {
-      try { window.focus(); } catch (_) {}
+      try { window.focus(); } catch { /* ignore */ }
       if (onClickCb) onClickCb();
     };
     return true;

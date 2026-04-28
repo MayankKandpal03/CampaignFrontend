@@ -79,7 +79,7 @@ export default function UserCard({ user, campaignCount, showDetails = false, onD
         {/* Campaign count (Manager view) */}
         {campaignCount !== undefined && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>CAMPAIGNS</span>
+            <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>TASKS</span>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: campaignCount > 0 ? T.gold : T.subtle, fontFamily: "'Cinzel', serif" }}>
               {campaignCount}
             </p>

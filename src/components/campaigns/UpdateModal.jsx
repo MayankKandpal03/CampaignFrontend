@@ -313,7 +313,7 @@ export default function UpdateModal({ campaign, onClose, onSave }) {
                   className="ops-focus"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Describe the campaign request…"
+                  placeholder="Describe the task request…"
                   rows={3}
                   required
                   style={{

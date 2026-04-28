@@ -218,7 +218,7 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
               letterSpacing:"0.1em", textTransform:"uppercase",
               color: accentColor, fontWeight:600,
             }}>
-              {isCampaign ? "🔴 New Campaign Assigned" : "⏰ Daily Task Due Now"}
+              {isCampaign ? "🔴 New Task Assigned" : "⏰ Daily Task Due Now"}
             </p>
             <h2 style={{
               margin:"0 0 3px", fontSize:19, fontWeight:700,
@@ -376,7 +376,7 @@ export default function ITDashboard() {
     _handleLogout();
   }, [_handleLogout]);
 
-  const [activeSection, setActiveSection] = useState("campaigns");
+  const [activeSection, setActiveSection] = useState("tasks");
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const [showNotifs,    setShowNotifs]    = useState(false);
   const [ackTarget,     setAckTarget]     = useState(null);
@@ -442,7 +442,7 @@ export default function ITDashboard() {
   // ── Push overlay helper ────────────────────────────────────────────────────
   const pushOverlay = useCallback((notif) => {
     const entry = { ...notif, id: Date.now() + Math.random() };
-    triggerAlert(entry.title, entry.body, () => { try { window.focus(); } catch (_) {} });
+    triggerAlert(entry.title, entry.body, () => { try { window.focus(); } catch { /* ignore */ } });
     setOverlayQueue(prev => [...prev, entry]);
     bcRef.current?.postMessage({ type: "overlay_push", notif: entry });
   }, []);
@@ -534,11 +534,11 @@ export default function ITDashboard() {
             : [c, ...s.campaigns],
         };
       });
-      const msgPreview = (c.pmMessage || c.message || "New campaign assigned").slice(0, 120);
+      const msgPreview = (c.pmMessage || c.message || "New task assigned").slice(0, 120);
       addNotification(`📋 New campaign in queue: "${msgPreview}${msgPreview.length >= 120 ? "…" : ""}"`);
       pushOverlay({
         type:  "campaign",
-        title: "New Campaign Assigned",
+        title: "New Task Assigned",
         body:  c.pmMessage || c.message?.slice(0, 200) || "A new campaign requires your acknowledgement.",
         item:  c,
       });
@@ -592,7 +592,6 @@ export default function ITDashboard() {
     return true;
   }), [campaigns, now]);
 
-  const doneCount    = useMemo(() => campaigns.filter(c => c.acknowledgement === "done").length, [campaigns]);
   const pendingCount = itCampaigns.length;
 
   // ── Toast helpers ──────────────────────────────────────────────────────────
@@ -606,7 +605,7 @@ export default function ITDashboard() {
     setRefreshing(true);
     await getCampaign().catch(console.error);
     setRefreshing(false);
-    pushToast("Campaigns refreshed");
+    pushToast("Tasks refreshed");
   };
 
   // ── Campaign acknowledge ───────────────────────────────────────────────────
@@ -624,10 +623,10 @@ export default function ITDashboard() {
       await updateCampaign(ackTarget._id, { acknowledgement, itMessage: finalMessage });
       if (acknowledgement === "done") {
         addNotification(`✅ Campaign "${ackTarget.message?.slice(0,30)}…" marked Done by ${user}`);
-        pushToast("Campaign acknowledged as Done. PMs & owner notified.");
+        pushToast("Task acknowledged as Done. PMs & owner notified.");
       } else {
         addNotification(`⚠ "${ackTarget.message?.slice(0,30)}…" marked Not Done — Reason: ${itMessage}`);
-        pushToast("Campaign marked Not Done.", "warn");
+        pushToast("Task marked Not Done.", "warn");
       }
       setAckTarget(null);
     } catch {
@@ -651,11 +650,9 @@ export default function ITDashboard() {
 
   // ── Nav ────────────────────────────────────────────────────────────────────
   const NAV_ITEMS = [
-    { id:"campaigns",      label:"Campaigns",      icon:"📋", count: pendingCount      },
+    { id:"tasks",      label:"Tasks",      icon:"📋", count: pendingCount      },
     { id:"schedule-tasks", label:"Schedule Tasks", icon:"🗓", count: dailyTasks.length },
   ];
-
-  const totalPending = pendingCount + dailyTasks.length;
 
   return (
     <div className="it-root" style={{ height:"100vh", overflow:"hidden" }}>
@@ -667,7 +664,7 @@ export default function ITDashboard() {
       {/* ── Sidebar ── */}
       <aside className={`it-sidebar ${sidebarOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-name">Campaign<i style={{ fontStyle:"normal", opacity:0.4 }}>.</i></div>
+          <div className="sidebar-brand-name">Task<i style={{ fontStyle:"normal", opacity:0.4 }}>.</i></div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
         <div className="sidebar-user">
@@ -722,11 +719,11 @@ export default function ITDashboard() {
           </button>
 
           <h1 className="header-title">
-            {activeSection === "campaigns" ? "Scheduled Campaigns" : "Schedule Tasks"}
+            {activeSection === "tasks" ? "Scheduled Campaigns" : "Schedule Tasks"}
           </h1>
 
           <span className="header-badge">
-            {activeSection === "campaigns"
+            {activeSection === "tasks"
               ? `${pendingCount} Pending`
               : `${dailyTasks.length} Due`}
           </span>
@@ -813,7 +810,7 @@ export default function ITDashboard() {
         </header>
 
         {/* ══════════════ CAMPAIGNS ══════════════ */}
-        {activeSection === "campaigns" && (
+        {activeSection === "tasks" && (
           <div
             className="it-content"
             style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}

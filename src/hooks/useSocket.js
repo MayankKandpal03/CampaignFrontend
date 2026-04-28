@@ -85,5 +85,5 @@ export const useSocket = (eventHandlers = {}) => {
       socket.disconnect();
     };
   // Re-create the socket when the token changes (login / logout).
-  }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [accessToken]);
 };

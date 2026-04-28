@@ -100,7 +100,7 @@ export default function TableToolbar({
         <input
           className="ops-focus"
           type="text"
-          placeholder="Search campaigns…"
+          placeholder="Search tasks…"
           value={search}
           onChange={e => onSearch(e.target.value)}
           style={{

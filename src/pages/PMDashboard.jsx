@@ -34,7 +34,7 @@ export default function PMDashboard() {
   const handleLogout    = useLogout();
   const isMobile        = useResponsive();
 
-  const [activeSection, setActiveSection] = useState("campaigns");
+  const [activeSection, setActiveSection] = useState("tasks");
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const [campaigns,     setCampaigns]     = useState([]);
   const [camLoading,    setCamLoading]    = useState(true);
@@ -173,7 +173,7 @@ export default function PMDashboard() {
   }, []);
 
   const NAV = [
-    { id:"campaigns",       label:"Campaigns",       count: campaigns.length      },
+    { id:"tasks",       label:"Tasks",       count: campaigns.length      },
     { id:"users",           label:"Users",           count: totalUsers            },
     { id:"manage-users",    label:"Manage Users"                                  },
     { id:"open-requests",   label:"Open Requests",   count: openRequests.length   },
@@ -182,7 +182,7 @@ export default function PMDashboard() {
   ];
 
   const SECTION_TITLE = {
-    campaigns:"Campaigns", users:"Users", "manage-users":"Manage Users",
+    campaigns:"Tasks", users:"Users", "manage-users":"Manage Users",
     "open-requests":"Open Requests", "closed-requests":"Closed Requests", "daily-tasks":"Daily Tasks",
   };
 
@@ -208,10 +208,10 @@ export default function PMDashboard() {
         <DashboardHeader isMobile={isMobile} onMenuToggle={() => setSidebarOpen(v => !v)} sidebarOpen={sidebarOpen}
           title={SECTION_TITLE[activeSection]||"Dashboard"} subLabel="PROCESS MANAGER"/>
 
-        {/* Campaigns — CampaignsTable owns its own scroll */}
-        {activeSection==="campaigns" && (
+        {/* Tasks — CampaignsTable owns its own scroll */}
+        {activeSection==="tasks" && (
           <div style={{ padding:pad, flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
-            <CampaignsTable campaigns={campaigns} loading={camLoading} onAction={setActionTarget} isMobile={isMobile} title="ALL CAMPAIGNS" showActionBtn/>
+            <CampaignsTable campaigns={campaigns} loading={camLoading} onAction={setActionTarget} isMobile={isMobile} title="ALL TASKS" showActionBtn/>
           </div>
         )}
 
@@ -236,7 +236,7 @@ export default function PMDashboard() {
 
         {activeSection==="open-requests" && (
           <div style={{ padding:pad, flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
-            <InfoBar color={T.teal} message={<>Campaigns <strong style={{color:T.amber}}>awaiting your review</strong> or <strong style={{color:T.teal}}>approved</strong> and waiting for IT.</>}/>
+            <InfoBar color={T.teal} message={<>Tasks <strong style={{color:T.amber}}>awaiting your review</strong> or <strong style={{color:T.teal}}>approved</strong> and waiting for IT.</>}/>
             <CampaignsTable campaigns={openRequests} loading={camLoading} onAction={setActionTarget} isMobile={isMobile} title="OPEN · PENDING & APPROVED" showActionBtn filterCards={OPEN_REQUEST_FILTER_CARDS}/>
           </div>
         )}

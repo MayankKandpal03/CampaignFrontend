@@ -8,7 +8,7 @@ import { useEffect } from 'react';
 import useNotifStore from '../../stores/useNotificationStore.js';
 import { fmt } from '../../utils/formatters.js';
 
-export default function ITNotifPanel({ open, onClose, width = 310 }) {
+export default function ITNotifPanel({ open, width = 310 }) {
   const { notifications, markRead, clearNotifs } = useNotifStore();
 
   useEffect(() => {

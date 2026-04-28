@@ -4,13 +4,13 @@
  * HOW "Sent to IT" works in real-time (two-path design):
  *
  * PATH A — Normal timer path:
- *   PM approves → useCampaigns patches store with `campaign:it_queued` →
+ *   PM approves → useTasks patches store with `campaign:it_queued` →
  *   campaigns change → useEffect finds nextTime → schedules setTimeout →
  *   when it fires, setNow(Date.now()) → re-render → scheduleReached=true → "Sent to IT".
  *
  * PATH B — campaign:schedule_fired socket path:
  *   Server timer fires → emits `campaign:schedule_fired` to owner's room →
- *   useCampaigns handles it → patchCampaign(c) → campaigns change →
+ *   useTasks handles it → patchCampaign(c) → campaigns change →
  *   useEffect cleanup runs (CLEARS the PATH-A timeout!) → effect re-runs →
  *   scheduleAt is now past → no new timeout → `now` stays stale → BUG: "Scheduled" forever.
  *
@@ -55,12 +55,12 @@ export default function PPCDashboard() {
   const addNotification = useNotifStore(s => s.addNotification);
   const handleLogout    = useLogout();
   const isMobile        = useResponsive();
-  // useCampaigns wires all socket events including campaign:schedule_fired
+  // useTasks wires all socket events including campaign:schedule_fired
   const { campaigns, getCampaign, createCampaign, updateCampaign } = useCampaigns({ onNotification: addNotification });
 
   const [loading,       setLoading]       = useState(true);
   const [pageError,     setPageError]     = useState("");
-  const [activeSection, setActiveSection] = useState("campaigns");
+  const [activeSection, setActiveSection] = useState("tasks");
   const [sidebarOpen,   setSidebarOpen]   = useState(false);
   const [filtersOpen,   setFiltersOpen]   = useState(false);
   const [statusFilter,  setStatusFilter]  = useState(null);
@@ -154,13 +154,13 @@ export default function PPCDashboard() {
     e.preventDefault();
     setCreateError(""); setCreateOk(false);
     if (!teamId)                    { setCreateError("Team not assigned. Contact your manager."); return; }
-    if (!createForm.message.trim()) { setCreateError("Campaign message is required."); return; }
+    if (!createForm.message.trim()) { setCreateError("Task message is required."); return; }
     setCreating(true);
     try {
       await createCampaign({ message: createForm.message.trim(), requestedAt: localToUTC(createForm.requestedAt), teamId });
       setCreateForm({ message:"", requestedAt: toLocalISO(new Date()) });
       setCreateOk(true);
-      setTimeout(() => { setActiveSection("campaigns"); setCreateOk(false); }, 1800);
+      setTimeout(() => { setActiveSection("tasks"); setCreateOk(false); }, 1800);
     } catch (err) {
       setCreateError(err?.response?.data?.message || "Failed to create campaign.");
     } finally { setCreating(false); }
@@ -169,8 +169,8 @@ export default function PPCDashboard() {
   const handleUpdate = useCallback(async (id, data) => { await updateCampaign(id, data); }, [updateCampaign]);
 
   const NAV = [
-    { id:"campaigns", label:"My Campaigns", count: campaigns.length },
-    { id:"create",    label:"Create Campaign" },
+    { id:"tasks", label:"My Tasks", count: campaigns.length },
+    { id:"create",    label:"Create Task" },
   ];
   const pad = isMobile ? "16px 14px" : "22px 28px";
 
@@ -189,7 +189,7 @@ export default function PPCDashboard() {
       <main style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, overflowY:"auto", overflowX:"hidden" }}>
         <DashboardHeader isMobile={isMobile}
           onMenuToggle={() => setSidebarOpen(v => !v)} sidebarOpen={sidebarOpen}
-          title={activeSection === "create" ? "Create Campaign" : "My Campaigns"}
+          title={activeSection === "create" ? "Create Task" : "My Tasks"}
           subLabel="PPC PANEL"/>
 
         {pageError && (
@@ -199,7 +199,7 @@ export default function PPCDashboard() {
         )}
 
         {/* ── CAMPAIGNS ── */}
-        {activeSection === "campaigns" && (
+        {activeSection === "tasks" && (
           <div style={{ padding:pad, flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
             {isMobile && (
               <button onClick={() => setFiltersOpen(v => !v)}
@@ -213,7 +213,7 @@ export default function PPCDashboard() {
               onSelect={handleFilterSelect} isMobile={isMobile} visible={!isMobile || filtersOpen}/>
 
             <div style={{ background:T.bgCard, border:`1px solid ${T.subtle}`, borderRadius:10, overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,0.3)", flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
-              <TableToolbar title="MY CAMPAIGNS" count={filtered.length} search={searchQuery} onSearch={setSearchQuery}
+              <TableToolbar title="MY TASKS" count={filtered.length} search={searchQuery} onSearch={setSearchQuery}
                 activeFilter={statusFilter} onClearFilter={() => setStatusFilter(null)} isMobile={isMobile}/>
 
               <div style={{ flex:1, overflow:"auto", minHeight:0 }}>
@@ -226,7 +226,7 @@ export default function PPCDashboard() {
                   <EmptyState
                     headline="No Records Found"
                     sub={searchQuery || statusFilter ? "Try adjusting your search or filter." : "Create your first campaign to get started."}
-                    action={!searchQuery && !statusFilter ? <GoldBtn onClick={() => goTo("create")} variant="outline">Create Campaign</GoldBtn> : null}/>
+                    action={!searchQuery && !statusFilter ? <GoldBtn onClick={() => goTo("create")} variant="outline">Create Task</GoldBtn> : null}/>
                 ) : (
                   <table style={{ width:"100%", borderCollapse:"collapse", minWidth:620 }}>
                     <thead style={{ position:"sticky", top:0, zIndex:1 }}>
@@ -298,7 +298,7 @@ export default function PPCDashboard() {
 
               {!loading && filtered.length > 0 && (
                 <div style={{ padding:"9px 18px", borderTop:`1px solid ${T.subtle}22`, display:"flex", justifyContent:"space-between", background:`${T.bg}99`, flexShrink:0 }}>
-                  <span style={{ fontSize:9, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{filtered.length} of {campaigns.length} campaigns</span>
+                  <span style={{ fontSize:9, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{filtered.length} of {campaigns.length} tasks</span>
                   <span style={{ fontSize:9, color:T.subtle, fontFamily:"'JetBrains Mono',monospace", display:"flex", alignItems:"center", gap:5 }}>
                     <span style={{ width:4, height:4, borderRadius:"50%", background:T.green, animation:"opsPulse 2s infinite" }}/>
                     Live updates active
@@ -321,22 +321,22 @@ export default function PPCDashboard() {
               </div>
               <div style={{ background:T.bgCard, border:`1px solid ${T.subtle}`, borderRadius:10, padding: isMobile ? "22px 18px" : "28px 28px 24px", boxShadow:"0 2px 12px rgba(0,0,0,0.3)" }}>
                 <p style={{ margin:"0 0 4px", fontSize:8, letterSpacing:"0.22em", color:"rgba(200,168,74,0.6)", fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>New Request</p>
-                <h2 style={{ margin:"0 0 22px", fontSize:18, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>Create Campaign</h2>
+                <h2 style={{ margin:"0 0 22px", fontSize:18, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>Create Task</h2>
                 {createError && <div style={{ padding:"10px 14px", borderRadius:8, marginBottom:18, background:T.redBg, border:`1px solid ${T.red}44`, color:T.red, fontSize:12 }}>{createError}</div>}
                 {createOk && <div style={{ padding:"10px 14px", borderRadius:8, marginBottom:18, background:T.greenBg, border:`1px solid ${T.green}44`, color:T.green, fontSize:12, display:"flex", alignItems:"center", gap:8 }}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                  Campaign submitted successfully
+                  Task submitted successfully
                 </div>}
                 <form onSubmit={handleCreate}>
                   <Field label="Message" hint="required">
-                    <textarea className="ops-focus" value={createForm.message} onChange={e => setCreateForm(f => ({ ...f, message: e.target.value }))} placeholder="Describe the campaign request…" rows={4} required style={{ ...inputSx, borderRadius:8, resize:"vertical", lineHeight:1.6 }}/>
+                    <textarea className="ops-focus" value={createForm.message} onChange={e => setCreateForm(f => ({ ...f, message: e.target.value }))} placeholder="Describe the task request…" rows={4} required style={{ ...inputSx, borderRadius:8, resize:"vertical", lineHeight:1.6 }}/>
                   </Field>
                   <Field label="Requested Date / Time" hint="defaults to now">
                     <input type="datetime-local" className="ops-focus" value={createForm.requestedAt} onChange={e => setCreateForm(f => ({ ...f, requestedAt: e.target.value }))} style={{ ...inputSx, borderRadius:8, colorScheme:"dark" }}/>
                   </Field>
                   <div style={{ borderTop:`1px solid ${T.subtle}`, paddingTop:20, marginTop:6 }}>
                     <GoldBtn type="submit" disabled={creating || !teamId} style={{ width:"100%", padding:"13px" }}>
-                      {creating ? "Submitting…" : !teamId ? "No Team Assigned" : "Submit Campaign"}
+                      {creating ? "Submitting…" : !teamId ? "No Team Assigned" : "Submit Task"}
                     </GoldBtn>
                   </div>
                 </form>

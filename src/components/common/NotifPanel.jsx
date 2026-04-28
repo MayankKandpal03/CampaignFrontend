@@ -7,7 +7,7 @@ import useNotifStore from "../../stores/useNotificationStore.js";
 import { T } from "../../constants/theme.js";
 import { fmt } from "../../utils/formatters.js";
 
-export default function NotifPanel({ open, onClose, width = 300 }) {
+export default function NotifPanel({ open, width = 300 }) {
   const { notifications, markRead, clearNotifs } = useNotifStore();
 
   useEffect(() => {

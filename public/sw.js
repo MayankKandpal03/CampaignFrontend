@@ -1,4 +1,5 @@
 /* public/sw.js — place this file in your React app's /public folder */
+/* global clients */
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => e.waitUntil(clients.claim()));

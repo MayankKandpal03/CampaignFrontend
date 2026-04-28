@@ -14,7 +14,7 @@ const COLS = [
 
 export default function CampaignsTable({
   campaigns, loading, onAction, isMobile,
-  title = "ALL CAMPAIGNS", showActionBtn = true, filterCards = PM_FILTER_CARDS,
+  title = "ALL TASKS", showActionBtn = true, filterCards = PM_FILTER_CARDS,
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState(null);
@@ -37,7 +37,7 @@ export default function CampaignsTable({
   // Fix: at the top of the effect, detect when any scheduleAt has crossed from
   // "future per stale now" to "past in real time". If found, call setNow()
   // immediately so the render catches up without needing a timeout.
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     const currentReal = Date.now();
@@ -50,6 +50,7 @@ export default function CampaignsTable({
     );
 
     if (justFired) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNow(currentReal); // triggers re-render; effect runs again, justFired will be false
       return;
     }
@@ -117,7 +118,7 @@ export default function CampaignsTable({
                 <span style={{ fontSize:8, fontWeight:700, letterSpacing:"0.16em", color: active ? card.color : T.muted, fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>{card.label}</span>
               </div>
               <div style={{ fontSize:24, fontWeight:700, color: active ? card.color : T.white, fontFamily:"'Cinzel',serif", lineHeight:1 }}>{stats[card.id] ?? 0}</div>
-              <div style={{ fontSize:9, color:T.muted, marginTop:4 }}>campaigns</div>
+              <div style={{ fontSize:9, color:T.muted, marginTop:4 }}>tasks</div>
             </div>
           );
         })}
@@ -158,7 +159,7 @@ export default function CampaignsTable({
           {loading ? (
             <div style={{ padding:"56px 20px", textAlign:"center", color:T.muted }}>
               <div style={{ width:32, height:32, borderRadius:"50%", border:`2px solid ${T.subtle}`, borderTopColor:T.gold, margin:"0 auto 14px", animation:"opsSpinner .8s linear infinite" }}/>
-              <p style={{ margin:0, fontSize:13 }}>Loading campaigns…</p>
+              <p style={{ margin:0, fontSize:13 }}>Loading tasks…</p>
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding:"60px 20px", textAlign:"center" }}>
@@ -278,7 +279,7 @@ export default function CampaignsTable({
         {/* Footer */}
         {!loading && filtered.length > 0 && (
           <div style={{ padding:"9px 18px", borderTop:`1px solid ${T.subtle}22`, display:"flex", justifyContent:"space-between", background:`${T.bg}99`, flexShrink:0 }}>
-            <span style={{ fontSize:9, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{filtered.length} of {campaigns.length} campaigns</span>
+            <span style={{ fontSize:9, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>{filtered.length} of {campaigns.length} tasks</span>
             <span style={{ fontSize:9, color:T.subtle, fontFamily:"'JetBrains Mono',monospace", display:"flex", alignItems:"center", gap:5 }}>
               <span style={{ width:4, height:4, borderRadius:"50%", background:T.green, animation:"opsPulse 2s infinite" }}/>
               Live updates active

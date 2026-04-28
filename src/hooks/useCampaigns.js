@@ -1,5 +1,5 @@
 /**
- * useCampaigns — campaign store + socket event wiring.
+ * useTasks — campaign store + socket event wiring.
  *
  * FIXES (original):
  *  1. DOUBLE CAMPAIGN: `addCampaign` checks existence before adding.
