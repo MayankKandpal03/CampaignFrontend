@@ -5,6 +5,7 @@
 //  - Smart setTimeout for `now` (no 10s polling).
 //  - Daily Tasks section fetch runs immediately on section activation
 //    (unchanged) — IT fix is in ITDashboard.
+//  - Added push notification permission banner + triggerAlert on key events.
 import { useEffect, useState, useCallback, useMemo } from "react";
 import useAuthStore  from "../stores/useAuthStore.js";
 import useNotifStore from "../stores/useNotificationStore.js";
@@ -16,6 +17,11 @@ import { OPEN_REQUEST_FILTER_CARDS, CLOSED_REQUEST_FILTER_CARDS } from "../const
 import { fmt }                             from "../utils/formatters.js";
 import { fetchCampaigns, updateCampaign }  from "../services/campaignService.js";
 import { fetchUsers, deleteUser }          from "../services/userService.js";
+import {
+  requestNotificationPermission,
+  getNotificationPermission,
+  triggerAlert,
+} from "../utils/itNotifications.js";
 import api                                 from "../api/axios.js";
 import OpsGlobalStyles  from "../components/common/OpsGlobalStyles.jsx";
 import GoldBtn          from "../components/common/GoldBtn.jsx";
@@ -43,6 +49,9 @@ export default function PMDashboard() {
   const [userLoading,   setUserLoading]   = useState(false);
   const [deleteTarget,  setDeleteTarget]  = useState(null);
 
+  // Push notification permission state
+  const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
+
   // Daily Tasks state
   const [dailyTasks,     setDailyTasks]     = useState([]);
   const [taskLoading,    setTaskLoading]    = useState(false);
@@ -57,6 +66,10 @@ export default function PMDashboard() {
     "campaign:created": c => {
       setCampaigns(p => p.some(x => x._id===c._id) ? p : [c,...p]);
       addNotification(`Campaign created by ${c.performerName||"someone"}`);
+      triggerAlert(
+        "New Campaign Created",
+        `${c.performerName || "Someone"}: ${c.message?.slice(0, 100) || "A new campaign was submitted"}`
+      );
     },
     "campaign:updated": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
@@ -75,13 +88,22 @@ export default function PMDashboard() {
     "campaign:deleted": d => setCampaigns(p => p.filter(x => x._id!==d._id)),
     "campaign:it_ack": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
-      addNotification(c.acknowledgement==="done"
+      const isDone = c.acknowledgement === "done";
+      addNotification(isDone
         ? `${c.performerName||"IT"} completed campaign`
         : `${c.performerName||"IT"} could not complete campaign`);
+      triggerAlert(
+        isDone ? "Campaign Completed ✅" : "Campaign Not Done ⚠️",
+        c.itMessage?.slice(0, 100) || c.message?.slice(0, 100) || "IT has responded to a campaign"
+      );
     },
     "dailytask:acked": t => {
       setDailyTasks(prev => prev.map(task => task._id===t._id ? { ...task, itResponse: t.itResponse } : task));
       addNotification(`✅ ${t.performerName||"IT"} acknowledged daily task`);
+      triggerAlert(
+        "Daily Task Acknowledged ✅",
+        `${t.performerName || "IT"} completed: ${t.task?.slice(0, 100) || "a scheduled task"}`
+      );
     },
   });
 
@@ -207,6 +229,56 @@ export default function PMDashboard() {
       <main style={{ flex:1, display:"flex", flexDirection:"column", minWidth:0, overflowY:"auto", overflowX:"hidden" }}>
         <DashboardHeader isMobile={isMobile} onMenuToggle={() => setSidebarOpen(v => !v)} sidebarOpen={sidebarOpen}
           title={SECTION_TITLE[activeSection]||"Dashboard"} subLabel="PROCESS MANAGER"/>
+
+        {/* ── Notification Permission Banner ── */}
+        {notifPermission !== "granted" && notifPermission !== "unsupported" && (
+          <div style={{
+            padding:       "10px 28px",
+            background:    notifPermission === "denied" ? T.redBg : T.amberBg,
+            borderBottom:  `1px solid ${notifPermission === "denied" ? T.red : T.amber}33`,
+            display:       "flex",
+            justifyContent:"space-between",
+            alignItems:    "center",
+            gap:           12,
+            flexWrap:      "wrap",
+          }}>
+            <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+              <span style={{ fontSize:15 }}>{notifPermission === "denied" ? "🔕" : "🔔"}</span>
+              <div>
+                <p style={{ margin:0, fontSize:12, fontWeight:500, color: notifPermission === "denied" ? T.red : T.amber }}>
+                  {notifPermission === "denied"
+                    ? "Desktop notifications are blocked — you won't receive alerts."
+                    : "Enable desktop notifications to get real-time alerts for campaigns and IT responses."}
+                </p>
+                {notifPermission === "denied" && (
+                  <p style={{ margin:"2px 0 0", fontSize:11, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>
+                    To re-enable: click the 🔒 lock icon in your browser address bar → Notifications → Allow
+                  </p>
+                )}
+              </div>
+            </div>
+            {notifPermission !== "denied" && (
+              <button
+                onClick={async () => {
+                  const ok = await requestNotificationPermission();
+                  setNotifPermission(ok ? "granted" : "denied");
+                }}
+                style={{
+                  padding:"6px 16px", borderRadius:4,
+                  border:`1px solid ${T.amber}`, background:"transparent",
+                  color:T.amber, fontSize:11, fontWeight:600,
+                  cursor:"pointer", fontFamily:"'Cinzel',serif",
+                  letterSpacing:"0.1em", whiteSpace:"nowrap",
+                  transition:"all 0.15s ease",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = T.amber; e.currentTarget.style.color = "#0c0906"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = T.amber; }}
+              >
+                ENABLE
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Tasks — CampaignsTable owns its own scroll */}
         {activeSection==="tasks" && (
