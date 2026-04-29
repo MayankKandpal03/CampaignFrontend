@@ -3,9 +3,10 @@
 //  - Layout: height:100vh, main overflowY:auto (scrollbar always in viewport).
 //  - campaign:schedule_fired socket event updates campaign in local state.
 //  - Smart setTimeout for `now` (no 10s polling).
-//  - Daily Tasks section fetch runs immediately on section activation
-//    (unchanged) — IT fix is in ITDashboard.
-//  - Added push notification permission banner + triggerAlert on key events.
+//  - Daily Tasks section fetch runs immediately on section activation.
+//  - Push notification permission banner + triggerAlert on key events.
+//  - registerPushSubscription() called when permission granted (mobile background support).
+//  - triggerAlert on campaign:updated (manager/PPC edits or cancels).
 import { useEffect, useState, useCallback, useMemo } from "react";
 import useAuthStore  from "../stores/useAuthStore.js";
 import useNotifStore from "../stores/useNotificationStore.js";
@@ -21,6 +22,7 @@ import {
   requestNotificationPermission,
   getNotificationPermission,
   triggerAlert,
+  registerPushSubscription,
 } from "../utils/itNotifications.js";
 import api                                 from "../api/axios.js";
 import OpsGlobalStyles  from "../components/common/OpsGlobalStyles.jsx";
@@ -61,8 +63,20 @@ export default function PMDashboard() {
   const [taskOk,         setTaskOk]         = useState(false);
   const [deactivatingId, setDeactivatingId] = useState(null);
 
-  // Socket handlers
+  // ── Register push subscription for background/mobile notifications ─────────
+  // This is what makes notifications work even when the tab is in the background
+  // on Android Chrome. Without this, alerts only fire while the tab is open.
+  useEffect(() => {
+    if (notifPermission === "granted") {
+      registerPushSubscription().catch(err =>
+        console.warn("[Push] PM registration failed:", err.message)
+      );
+    }
+  }, [notifPermission]);
+
+  // ── Socket handlers ────────────────────────────────────────────────────────
   useSocket({
+    // fires when manager or PPC creates a campaign
     "campaign:created": c => {
       setCampaigns(p => p.some(x => x._id===c._id) ? p : [c,...p]);
       addNotification(`Campaign created by ${c.performerName||"someone"}`);
@@ -71,21 +85,43 @@ export default function PMDashboard() {
         `${c.performerName || "Someone"}: ${c.message?.slice(0, 100) || "A new campaign was submitted"}`
       );
     },
+
+    // fires when manager or PPC edits OR cancels a campaign
     "campaign:updated": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
-      addNotification(c.status==="cancel"||c.action==="cancel"
-        ? `Campaign cancelled by ${c.performerName||"someone"}`
-        : `Campaign updated by ${c.performerName||"someone"}`);
+
+      const isCancelled = c.status === "cancel" || c.action === "cancel";
+      const performer   = c.performerName || "Someone";
+      const preview     = c.message?.slice(0, 80) || "a campaign";
+
+      if (isCancelled) {
+        addNotification(`Campaign cancelled by ${performer}`);
+        triggerAlert(
+          "Campaign Cancelled ❌",
+          `${performer} cancelled: "${preview}"`
+        );
+      } else {
+        addNotification(`Campaign updated by ${performer}`);
+        triggerAlert(
+          "Campaign Updated ✏️",
+          `${performer} edited: "${preview}"`
+        );
+      }
     },
+
     "campaign:it_queued": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
       addNotification(`Campaign approved by ${c.performerName||"PM"} — sent to IT`);
     },
+
     // Patch campaign when server timer fires — keeps table state accurate
     "campaign:schedule_fired": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
     },
+
     "campaign:deleted": d => setCampaigns(p => p.filter(x => x._id!==d._id)),
+
+    // fires when IT marks campaign done or not done
     "campaign:it_ack": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
       const isDone = c.acknowledgement === "done";
@@ -97,6 +133,8 @@ export default function PMDashboard() {
         c.itMessage?.slice(0, 100) || c.message?.slice(0, 100) || "IT has responded to a campaign"
       );
     },
+
+    // fires when IT acknowledges a daily task
     "dailytask:acked": t => {
       setDailyTasks(prev => prev.map(task => task._id===t._id ? { ...task, itResponse: t.itResponse } : task));
       addNotification(`✅ ${t.performerName||"IT"} acknowledged daily task`);
@@ -154,10 +192,10 @@ export default function PMDashboard() {
   }, [activeSection, loadDailyTasks]);
 
   // Derived data
-  const openRequests = useMemo(() => campaigns.filter(c => !c.action||c.action==="approve"), [campaigns]);
+  const openRequests   = useMemo(() => campaigns.filter(c => !c.action||c.action==="approve"), [campaigns]);
   const closedRequests = useMemo(() => campaigns.filter(c => c.status==="cancel"||c.action==="cancel"||c.status==="done"||c.status==="not done"), [campaigns]);
-  const totalUsers = useMemo(() => users.filter(u => ["manager","ppc","it"].includes(u.role)).length, [users]);
-  const activeTasks = useMemo(() => dailyTasks.filter(t => t.isSchedule!==false), [dailyTasks]);
+  const totalUsers     = useMemo(() => users.filter(u => ["manager","ppc","it"].includes(u.role)).length, [users]);
+  const activeTasks    = useMemo(() => dailyTasks.filter(t => t.isSchedule!==false), [dailyTasks]);
 
   const goTo = section => { setActiveSection(section); setSidebarOpen(false); };
 
@@ -166,8 +204,8 @@ export default function PMDashboard() {
     if (updated) setCampaigns(prev => prev.map(c => c._id===updated._id ? updated : c));
   }, []);
 
-  const handleDeleteUser   = useCallback(async id => { await deleteUser(id); setUsers(prev => prev.filter(u => u._id!==id)); }, []);
-  const handleUserCreated  = useCallback(() => { if (activeSection==="users") loadUsers(); }, [activeSection, loadUsers]);
+  const handleDeleteUser  = useCallback(async id => { await deleteUser(id); setUsers(prev => prev.filter(u => u._id!==id)); }, []);
+  const handleUserCreated = useCallback(() => { if (activeSection==="users") loadUsers(); }, [activeSection, loadUsers]);
 
   const handleCreateTask = useCallback(async (e) => {
     e.preventDefault();
@@ -195,7 +233,7 @@ export default function PMDashboard() {
   }, []);
 
   const NAV = [
-    { id:"tasks",       label:"Tasks",       count: campaigns.length      },
+    { id:"tasks",           label:"Tasks",           count: campaigns.length      },
     { id:"users",           label:"Users",           count: totalUsers            },
     { id:"manage-users",    label:"Manage Users"                                  },
     { id:"open-requests",   label:"Open Requests",   count: openRequests.length   },
@@ -204,7 +242,7 @@ export default function PMDashboard() {
   ];
 
   const SECTION_TITLE = {
-    campaigns:"Tasks", users:"Users", "manage-users":"Manage Users",
+    tasks:"Tasks", users:"Users", "manage-users":"Manage Users",
     "open-requests":"Open Requests", "closed-requests":"Closed Requests", "daily-tasks":"Daily Tasks",
   };
 
@@ -233,14 +271,14 @@ export default function PMDashboard() {
         {/* ── Notification Permission Banner ── */}
         {notifPermission !== "granted" && notifPermission !== "unsupported" && (
           <div style={{
-            padding:       "10px 28px",
-            background:    notifPermission === "denied" ? T.redBg : T.amberBg,
-            borderBottom:  `1px solid ${notifPermission === "denied" ? T.red : T.amber}33`,
-            display:       "flex",
-            justifyContent:"space-between",
-            alignItems:    "center",
-            gap:           12,
-            flexWrap:      "wrap",
+            padding:        "10px 28px",
+            background:     notifPermission === "denied" ? T.redBg : T.amberBg,
+            borderBottom:   `1px solid ${notifPermission === "denied" ? T.red : T.amber}33`,
+            display:        "flex",
+            justifyContent: "space-between",
+            alignItems:     "center",
+            gap:            12,
+            flexWrap:       "wrap",
           }}>
             <div style={{ display:"flex", alignItems:"center", gap:9 }}>
               <span style={{ fontSize:15 }}>{notifPermission === "denied" ? "🔕" : "🔔"}</span>
@@ -248,7 +286,7 @@ export default function PMDashboard() {
                 <p style={{ margin:0, fontSize:12, fontWeight:500, color: notifPermission === "denied" ? T.red : T.amber }}>
                   {notifPermission === "denied"
                     ? "Desktop notifications are blocked — you won't receive alerts."
-                    : "Enable desktop notifications to get real-time alerts for campaigns and IT responses."}
+                    : "Enable notifications to get real-time alerts for new campaigns, updates, and IT responses."}
                 </p>
                 {notifPermission === "denied" && (
                   <p style={{ margin:"2px 0 0", fontSize:11, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>
