@@ -1,12 +1,7 @@
 // src/pages/PMDashboard.jsx
 // CHANGES:
-//  - Layout: height:100vh, main overflowY:auto (scrollbar always in viewport).
-//  - campaign:schedule_fired socket event updates campaign in local state.
-//  - Smart setTimeout for `now` (no 10s polling).
-//  - Daily Tasks section fetch runs immediately on section activation.
-//  - Push notification permission banner + triggerAlert on key events.
-//  - registerPushSubscription() called when permission granted (mobile background support).
-//  - triggerAlert on campaign:updated (manager/PPC edits or cancels).
+//  - Added "saved-messages" nav item + section render.
+//  - All prior behaviour unchanged.
 import { useEffect, useState, useCallback, useMemo } from "react";
 import useAuthStore  from "../stores/useAuthStore.js";
 import useNotifStore from "../stores/useNotificationStore.js";
@@ -25,16 +20,17 @@ import {
   registerPushSubscription,
 } from "../utils/itNotifications.js";
 import api                                 from "../api/axios.js";
-import OpsGlobalStyles  from "../components/common/OpsGlobalStyles.jsx";
-import GoldBtn          from "../components/common/GoldBtn.jsx";
-import Field            from "../components/common/Field.jsx";
-import DashboardSidebar from "../components/layout/DashboardSidebar.jsx";
-import DashboardHeader  from "../components/layout/DashboardHeader.jsx";
-import ActionModal      from "../components/campaigns/ActionModal.jsx";
-import CampaignsTable   from "../components/campaigns/CampaignsTable.jsx";
-import DeleteUserModal  from "../components/users/DeleteUserModal.jsx";
-import CreateUserForm   from "../components/users/CreateUserForm.jsx";
-import PMUserSection    from "../components/users/PMUserSection.jsx";
+import OpsGlobalStyles      from "../components/common/OpsGlobalStyles.jsx";
+import GoldBtn              from "../components/common/GoldBtn.jsx";
+import Field                from "../components/common/Field.jsx";
+import DashboardSidebar     from "../components/layout/DashboardSidebar.jsx";
+import DashboardHeader      from "../components/layout/DashboardHeader.jsx";
+import ActionModal          from "../components/campaigns/ActionModal.jsx";
+import CampaignsTable       from "../components/campaigns/CampaignsTable.jsx";
+import DeleteUserModal      from "../components/users/DeleteUserModal.jsx";
+import CreateUserForm       from "../components/users/CreateUserForm.jsx";
+import PMUserSection        from "../components/users/PMUserSection.jsx";
+import SavedMessagesSection from "../components/messages/SavedMessagesSection.jsx"; // ← NEW
 
 export default function PMDashboard() {
   const user            = useAuthStore(s => s.user);
@@ -51,7 +47,6 @@ export default function PMDashboard() {
   const [userLoading,   setUserLoading]   = useState(false);
   const [deleteTarget,  setDeleteTarget]  = useState(null);
 
-  // Push notification permission state
   const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
 
   // Daily Tasks state
@@ -63,9 +58,6 @@ export default function PMDashboard() {
   const [taskOk,         setTaskOk]         = useState(false);
   const [deactivatingId, setDeactivatingId] = useState(null);
 
-  // ── Register push subscription for background/mobile notifications ─────────
-  // This is what makes notifications work even when the tab is in the background
-  // on Android Chrome. Without this, alerts only fire while the tab is open.
   useEffect(() => {
     if (notifPermission === "granted") {
       registerPushSubscription().catch(err =>
@@ -76,7 +68,6 @@ export default function PMDashboard() {
 
   // ── Socket handlers ────────────────────────────────────────────────────────
   useSocket({
-    // fires when manager or PPC creates a campaign
     "campaign:created": c => {
       setCampaigns(p => p.some(x => x._id===c._id) ? p : [c,...p]);
       addNotification(`Campaign created by ${c.performerName||"someone"}`);
@@ -85,43 +76,27 @@ export default function PMDashboard() {
         `${c.performerName || "Someone"}: ${c.message?.slice(0, 100) || "A new campaign was submitted"}`
       );
     },
-
-    // fires when manager or PPC edits OR cancels a campaign
     "campaign:updated": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
-
       const isCancelled = c.status === "cancel" || c.action === "cancel";
       const performer   = c.performerName || "Someone";
       const preview     = c.message?.slice(0, 80) || "a campaign";
-
       if (isCancelled) {
         addNotification(`Campaign cancelled by ${performer}`);
-        triggerAlert(
-          "Campaign Cancelled ❌",
-          `${performer} cancelled: "${preview}"`
-        );
+        triggerAlert("Campaign Cancelled ❌", `${performer} cancelled: "${preview}"`);
       } else {
         addNotification(`Campaign updated by ${performer}`);
-        triggerAlert(
-          "Campaign Updated ✏️",
-          `${performer} edited: "${preview}"`
-        );
+        triggerAlert("Campaign Updated ✏️", `${performer} edited: "${preview}"`);
       }
     },
-
     "campaign:it_queued": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
       addNotification(`Campaign approved by ${c.performerName||"PM"} — sent to IT`);
     },
-
-    // Patch campaign when server timer fires — keeps table state accurate
     "campaign:schedule_fired": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
     },
-
     "campaign:deleted": d => setCampaigns(p => p.filter(x => x._id!==d._id)),
-
-    // fires when IT marks campaign done or not done
     "campaign:it_ack": c => {
       setCampaigns(p => p.map(x => x._id===c._id ? c : x));
       const isDone = c.acknowledgement === "done";
@@ -133,8 +108,6 @@ export default function PMDashboard() {
         c.itMessage?.slice(0, 100) || c.message?.slice(0, 100) || "IT has responded to a campaign"
       );
     },
-
-    // fires when IT acknowledges a daily task
     "dailytask:acked": t => {
       setDailyTasks(prev => prev.map(task => task._id===t._id ? { ...task, itResponse: t.itResponse } : task));
       addNotification(`✅ ${t.performerName||"IT"} acknowledged daily task`);
@@ -145,7 +118,6 @@ export default function PMDashboard() {
     },
   });
 
-  // Campaign load
   const loadCampaigns = useCallback(async () => {
     setCamLoading(true);
     try { setCampaigns(await fetchCampaigns()); }
@@ -155,7 +127,6 @@ export default function PMDashboard() {
 
   useEffect(() => { loadCampaigns(); }, [loadCampaigns]);
 
-  // User load
   const loadUsers = useCallback(async () => {
     setUserLoading(true);
     try {
@@ -176,7 +147,6 @@ export default function PMDashboard() {
 
   useEffect(() => { if (activeSection==="users") loadUsers(); }, [activeSection, loadUsers]);
 
-  // Daily task load
   const loadDailyTasks = useCallback(async () => {
     setTaskLoading(true);
     try {
@@ -191,7 +161,6 @@ export default function PMDashboard() {
     if (activeSection==="daily-tasks") loadDailyTasks();
   }, [activeSection, loadDailyTasks]);
 
-  // Derived data
   const openRequests   = useMemo(() => campaigns.filter(c => !c.action||c.action==="approve"), [campaigns]);
   const closedRequests = useMemo(() => campaigns.filter(c => c.status==="cancel"||c.action==="cancel"||c.status==="done"||c.status==="not done"), [campaigns]);
   const totalUsers     = useMemo(() => users.filter(u => ["manager","ppc","it"].includes(u.role)).length, [users]);
@@ -239,11 +208,14 @@ export default function PMDashboard() {
     { id:"open-requests",   label:"Open Requests",   count: openRequests.length   },
     { id:"closed-requests", label:"Closed Requests", count: closedRequests.length },
     { id:"daily-tasks",     label:"Daily Tasks",     count: activeTasks.length    },
+    { id:"saved-messages",  label:"Saved Messages"                                }, // ← NEW
   ];
 
   const SECTION_TITLE = {
     tasks:"Tasks", users:"Users", "manage-users":"Manage Users",
-    "open-requests":"Open Requests", "closed-requests":"Closed Requests", "daily-tasks":"Daily Tasks",
+    "open-requests":"Open Requests", "closed-requests":"Closed Requests",
+    "daily-tasks":"Daily Tasks",
+    "saved-messages":"Saved Messages",                                              // ← NEW
   };
 
   const pad = isMobile ? "16px 14px" : "22px 28px";
@@ -318,19 +290,21 @@ export default function PMDashboard() {
           </div>
         )}
 
-        {/* Tasks — CampaignsTable owns its own scroll */}
+        {/* ── TASKS ── */}
         {activeSection==="tasks" && (
           <div style={{ padding:pad, flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
             <CampaignsTable campaigns={campaigns} loading={camLoading} onAction={setActionTarget} isMobile={isMobile} title="ALL TASKS" showActionBtn/>
           </div>
         )}
 
+        {/* ── USERS ── */}
         {activeSection==="users" && (
           <div style={{ padding:pad, flex:1, overflowY:"auto" }}>
             <PMUserSection users={users} loading={userLoading} onDelete={target => setDeleteTarget(target)} onRefresh={loadUsers}/>
           </div>
         )}
 
+        {/* ── MANAGE USERS ── */}
         {activeSection==="manage-users" && (
           <div style={{ padding:pad, flex:1, overflowY:"auto" }}>
             <div style={{ maxWidth:540 }}>
@@ -344,6 +318,7 @@ export default function PMDashboard() {
           </div>
         )}
 
+        {/* ── OPEN REQUESTS ── */}
         {activeSection==="open-requests" && (
           <div style={{ padding:pad, flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
             <InfoBar color={T.teal} message={<>Tasks <strong style={{color:T.amber}}>awaiting your review</strong> or <strong style={{color:T.teal}}>approved</strong> and waiting for IT.</>}/>
@@ -351,6 +326,7 @@ export default function PMDashboard() {
           </div>
         )}
 
+        {/* ── CLOSED REQUESTS ── */}
         {activeSection==="closed-requests" && (
           <div style={{ padding:pad, flex:1, display:"flex", flexDirection:"column", minHeight:0 }}>
             <InfoBar color={T.muted} message="Closed campaigns — marked Done, Not Done, or Cancelled."/>
@@ -358,7 +334,7 @@ export default function PMDashboard() {
           </div>
         )}
 
-        {/* DAILY TASKS */}
+        {/* ── DAILY TASKS ── */}
         {activeSection==="daily-tasks" && (
           <div style={{ padding:pad, flex:1, overflowY:"auto" }}>
             <InfoBar color={T.purple} message="Schedule recurring daily tasks for IT. Each task is automatically delivered to IT at the specified time every day."/>
@@ -452,6 +428,11 @@ export default function PMDashboard() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* ── SAVED MESSAGES ── (NEW) */}
+        {activeSection==="saved-messages" && (
+          <SavedMessagesSection isMobile={isMobile} />
         )}
       </main>
 
