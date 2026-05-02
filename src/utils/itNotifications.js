@@ -1,14 +1,17 @@
 // src/utils/itNotifications.js
 //
 // USED BY: ITDashboard + PMDashboard
-// Despite the "it" prefix on the file name this module handles push for
-// both roles — the backend stores the role on subscribe so targeting is
-// handled server-side.
 //
 // CHANGES:
+//  - triggerAlert: removed showNativeNotification call.
+//    Chrome/Edge always deliver the service-worker Web Push notification even
+//    when the tab is focused. Calling new Notification() here as well produces
+//    two OS-level alerts in those browsers (Brave deduplicates them, which is
+//    why you saw only 1 there).  The push notification from the backend covers
+//    the OS alert; the in-tab overlay card (IT) or the bell badge (PM) cover
+//    the visible-page feedback.  triggerAlert now only plays the audio chime.
 //  - registerPushSubscription: wraps any error from /push/subscribe so a
 //    network failure doesn't prevent the rest of the dashboard from loading.
-//  - playNotificationSound: unchanged.
 //  - All other exports: unchanged.
 
 import api from "../api/axios.js";
@@ -47,9 +50,6 @@ const urlBase64ToUint8Array = (base64String) => {
  * Call this once after the user grants notification permission.
  * Safe to call again — will reuse an existing subscription.
  *
- * The backend stores the subscription keyed to the current user + role,
- * so IT users get IT pushes and PMs get PM pushes automatically.
- *
  * @returns {Promise<boolean>} true on success, false on any failure
  */
 export const registerPushSubscription = async () => {
@@ -71,7 +71,6 @@ export const registerPushSubscription = async () => {
     const registration = await navigator.serviceWorker.register("/sw.js", {
       scope: "/",
     });
-    // Wait until it's active before subscribing
     await navigator.serviceWorker.ready;
 
     // 3. Check for an existing subscription first to avoid unnecessary re-subscribes
@@ -79,7 +78,7 @@ export const registerPushSubscription = async () => {
 
     if (!subscription) {
       subscription = await registration.pushManager.subscribe({
-        userVisibleOnly:      true,   // required by Chrome / all browsers
+        userVisibleOnly:      true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
     }
@@ -98,7 +97,6 @@ export const registerPushSubscription = async () => {
 
 /**
  * Unsubscribe from Web Push (call on logout).
- * Cleans up both the browser subscription and the server record.
  */
 export const unregisterPushSubscription = async () => {
   if (!("serviceWorker" in navigator)) return;
@@ -107,7 +105,6 @@ export const unregisterPushSubscription = async () => {
     if (!reg) return;
     const sub = await reg.pushManager.getSubscription();
     if (sub) await sub.unsubscribe();
-    // Best-effort server cleanup — ignore network errors on logout
     await api.post("/push/unsubscribe").catch(() => {});
   } catch (err) {
     console.warn("[Push] Unsubscribe failed:", err.message);
@@ -115,8 +112,6 @@ export const unregisterPushSubscription = async () => {
 };
 
 // ── In-tab sound ─────────────────────────────────────────────────────────────
-// Plays a 3-note chime when a notification arrives while the tab is open.
-// Complements the OS push which fires when the tab is closed/background.
 
 let _audioCtx = null;
 
@@ -157,10 +152,9 @@ export const playNotificationSound = () => {
   }
 };
 
-// ── Native (OS-level) in-tab Notification ───────────────────────────────────
-// Used when the tab IS open — shows a native browser notification.
-// When the tab is closed the SW handles this automatically via Web Push.
-
+// ── Native (OS-level) in-tab Notification ────────────────────────────────────
+// Kept as a standalone export for callers that explicitly need it (e.g. a
+// fallback when VAPID / push is not configured at all).
 export const showNativeNotification = (title, body, onClickCb) => {
   if (!hasNotificationPermission()) return false;
   try {
@@ -184,10 +178,27 @@ export const showNativeNotification = (title, body, onClickCb) => {
 };
 
 /**
- * Plays sound + shows an OS notification.
- * Use this for in-tab alerts. Background alerts come via Web Push (sw.js).
+ * Plays the audio chime.
+ *
+ * FIX — duplicate notifications:
+ * Chrome and Edge always display the service-worker Web Push notification
+ * even when the tab is focused. Calling showNativeNotification() here as
+ * well produces two OS-level alerts in those browsers. Brave happens to
+ * deduplicate/suppress one of them, which is why only one appeared there.
+ *
+ * The service-worker push (sent by the backend) is the authoritative OS
+ * alert. In-tab visual feedback is handled by:
+ *   • OverlayNotif card  — IT dashboard
+ *   • Notification bell  — PM dashboard
+ *
+ * triggerAlert therefore only plays the chime. If you deploy without VAPID
+ * keys and need an OS fallback, uncomment the guarded line below.
  */
 export const triggerAlert = (title, body, onClickCb) => {
   playNotificationSound();
-  return showNativeNotification(title, body, onClickCb);
+
+  // Uncomment ONLY if you have no VAPID / push setup and need a fallback:
+  // if (!navigator.serviceWorker?.controller) showNativeNotification(title, body, onClickCb);
+
+  return false;
 };

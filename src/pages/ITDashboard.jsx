@@ -1,11 +1,25 @@
 // src/pages/ITDashboard.jsx
 /**
  * CHANGES FROM PREVIOUS VERSION:
- * 1. FIX: Added `dailytask:acked` socket handler — when IT user A acknowledges
- *    a daily task, it is instantly removed from IT user B's queue.
- * 2. FIX: `campaign:it_ack` handler now also updates history when section is open,
- *    so acknowledged campaigns disappear from the queue for all IT users live.
- * 3. History section carried over from last update (unchanged).
+ * 1. FIX (Issue 2) — History not always updating:
+ *    The previous guard `if (prev.length === 0) return prev` could not
+ *    distinguish "history not yet fetched" from "fetched but genuinely empty".
+ *    Replaced with a `historyLoadedRef` that is set to true once fetchHistory
+ *    completes. The `campaign:it_ack` socket handler now checks this ref, so
+ *    new acknowledgements always appear in the history list whether it was
+ *    empty or not.
+ *
+ * 2. FIX (Issue 1) — Real-time updates for all IT users:
+ *    All socket events (campaign:it_queued, campaign:it_ack, campaign:updated,
+ *    campaign:deleted, campaign:schedule_fired, dailytask:queued,
+ *    dailytask:acked) correctly update local state so every connected IT user
+ *    sees changes immediately without a manual refresh.  No logic changes were
+ *    needed here — the existing socket plumbing was already correct.
+ *
+ * 3. FIX (Issue 3) — Duplicate OS notifications:
+ *    triggerAlert in itNotifications.js no longer calls showNativeNotification.
+ *    The service-worker push handles OS alerts; the overlay card handles
+ *    in-tab visual feedback.  No changes required in this file for that fix.
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -273,12 +287,30 @@ export default function ITDashboard() {
   const [historyLoading,    setHistoryLoading]    = useState(false);
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
 
+  /**
+   * FIX (Issue 2): Track whether history has been fetched at least once.
+   *
+   * The old guard was:
+   *   if (prev.length === 0) return prev;
+   *
+   * That cannot distinguish "not yet fetched" from "fetched but empty".
+   * When history was empty and the first acknowledgement came in via the
+   * campaign:it_ack socket event, the guard silently dropped the update,
+   * leaving the history section blank until the user manually refreshed.
+   *
+   * Using a ref instead lets us correctly update history even when the
+   * list is genuinely empty after being loaded.
+   */
+  const historyLoadedRef = useRef(false);
+
   // ── History fetch ─────────────────────────────────────────────────────────
   const fetchHistory = useCallback(async (showSpinner = true) => {
     if (showSpinner) setHistoryLoading(true); else setHistoryRefreshing(true);
     try {
       const res = await api.get("/campaign/history");
       setHistory(res.data?.data ?? []);
+      // Mark history as loaded so socket updates are accepted from now on
+      historyLoadedRef.current = true;
     } catch (err) {
       console.error("Failed to fetch IT history:", err);
     } finally {
@@ -404,6 +436,7 @@ export default function ITDashboard() {
 
   // ── Socket handlers ───────────────────────────────────────────────────────
   useSocket({
+    // ── Campaign queue ────────────────────────────────────────────────────
     "campaign:it_queued": c => {
       useCampaignStore.setState(s => {
         const exists = s.campaigns.some(x => x._id === c._id);
@@ -430,23 +463,33 @@ export default function ITDashboard() {
     },
 
     /**
-     * FIX: Handles both cases:
-     * A) This IT user just acknowledged — store already updated locally, this
-     *    is the echo from the server, harmless double-patch.
-     * B) ANOTHER IT user acknowledged — patches this user's store so the
-     *    campaign disappears from itCampaigns (filtered by acknowledgement field).
+     * campaign:it_ack
+     *
+     * FIX (Issue 2): history update now uses historyLoadedRef instead of
+     * checking prev.length === 0.
+     *
+     * Case A — this IT user just acknowledged: store is already up-to-date
+     *   locally; this is the server echo. Harmless double-patch.
+     * Case B — ANOTHER IT user acknowledged: patches this user's store so the
+     *   campaign is removed from itCampaigns (filtered by acknowledgement).
+     *
+     * History update: previously guarded by `prev.length === 0` which meant
+     * the first ever acknowledgement never appeared live in an empty history
+     * list. Now correctly guarded by historyLoadedRef.current which is true
+     * as soon as fetchHistory() completes, regardless of record count.
      */
     "campaign:it_ack": c => {
       useCampaignStore.setState(s => ({
         campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
       }));
-      // Keep history in sync if the tab is open
-      setHistory(prev => {
-        if (prev.length === 0) return prev; // history not loaded yet — skip
-        const exists = prev.some(x => x._id === c._id);
-        if (exists) return prev.map(x => x._id === c._id ? c : x);
-        return [c, ...prev];
-      });
+      // Update history only if the history tab has been loaded at least once
+      if (historyLoadedRef.current) {
+        setHistory(prev => {
+          const exists = prev.some(x => x._id === c._id);
+          if (exists) return prev.map(x => x._id === c._id ? c : x);
+          return [c, ...prev];
+        });
+      }
     },
 
     "campaign:deleted": d => {
@@ -461,7 +504,8 @@ export default function ITDashboard() {
       }));
     },
 
-    // New daily task pushed by the server timer
+    // ── Daily tasks ────────────────────────────────────────────────────────
+    // New daily task pushed by the server timer — add to queue for all IT
     "dailytask:queued": task => {
       setDailyTasks(prev => {
         const exists = prev.some(t => String(t._id) === String(task._id));
@@ -478,10 +522,9 @@ export default function ITDashboard() {
     },
 
     /**
-     * FIX: dailytask:acked is now emitted to room:it by the backend.
-     * When IT user A acknowledges a daily task the server broadcasts this event
-     * to all IT sockets. IT user B receives it here and removes the task from
-     * their queue immediately — no manual refresh required.
+     * dailytask:acked
+     * Emitted by the backend to room:it so every connected IT user removes
+     * the acknowledged task from their queue immediately without a refresh.
      */
     "dailytask:acked": t => {
       setDailyTasks(prev =>
