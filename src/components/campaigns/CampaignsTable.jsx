@@ -90,6 +90,7 @@ export default function CampaignsTable({
       const q = search.toLowerCase();
       list = list.filter(c =>
         c.message?.toLowerCase().includes(q) ||
+        c.pmMessage?.toLowerCase().includes(q) ||
         (typeof c.createdBy === "object" ? c.createdBy?.username : "")?.toLowerCase().includes(q)
       );
     }

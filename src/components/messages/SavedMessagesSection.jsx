@@ -2,14 +2,8 @@
 /**
  * SavedMessagesSection
  *
- * Self-contained: fetches, creates, edits, and deletes saved messages.
- *
- * Each card exposes:
- *   • Copy button — copies the text to clipboard; shows "Copied!" for 1.6 s.
- *   • Edit button — turns the card into an inline textarea; Save / Cancel.
- *   • Delete button — shows a compact inline confirm step before deleting.
- *
- * Displayed only inside PMDashboard (process manager role).
+ * CHANGES:
+ *  - Added search bar to filter messages by content.
  */
 import { useState, useCallback, useEffect } from "react";
 import { T, inputSx } from "../../constants/theme.js";
@@ -89,7 +83,6 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      // Fallback for older browsers
       const el = document.createElement("textarea");
       el.value = msg.message;
       document.body.appendChild(el);
@@ -159,7 +152,6 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
         }
       }}
     >
-      {/* ── Message body ── */}
       {editing ? (
         <>
           <textarea
@@ -169,10 +161,10 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
             rows={4}
             style={{
               ...inputSx,
-              width:      "100%",
+              width:        "100%",
               borderRadius: 6,
-              resize:     "vertical",
-              lineHeight: 1.65,
+              resize:       "vertical",
+              lineHeight:   1.65,
               marginBottom: 10,
             }}
             autoFocus
@@ -181,11 +173,7 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
             <p style={{ margin:"0 0 10px", fontSize:11, color:T.red }}>{editError}</p>
           )}
           <div style={{ display:"flex", gap:8 }}>
-            <GoldBtn
-              onClick={handleSave}
-              disabled={saving}
-              style={{ flex:1, padding:"8px" }}
-            >
+            <GoldBtn onClick={handleSave} disabled={saving} style={{ flex:1, padding:"8px" }}>
               {saving ? "Saving…" : "Save"}
             </GoldBtn>
             <button
@@ -207,7 +195,6 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
         </>
       ) : (
         <>
-          {/* Message text */}
           <p style={{
             margin:     "0 0 14px",
             fontSize:   13,
@@ -220,9 +207,7 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
             {msg.message}
           </p>
 
-          {/* Action row */}
           {delConfirm ? (
-            /* Inline delete confirm */
             <div style={{
               display:      "flex",
               alignItems:   "center",
@@ -265,7 +250,6 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
             </div>
           ) : (
             <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
-              {/* Copy */}
               <button
                 onClick={handleCopy}
                 style={{
@@ -304,10 +288,8 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                 {copied ? "Copied!" : "Copy"}
               </button>
 
-              {/* Spacer */}
               <span style={{ flex:1 }}/>
 
-              {/* Edit */}
               <button
                 className="ops-upd"
                 onClick={() => { setEditing(true); setEditText(msg.message); }}
@@ -332,7 +314,6 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                 <EditIcon /> Edit
               </button>
 
-              {/* Delete */}
               <button
                 className="ops-del"
                 onClick={() => setDelConfirm(true)}
@@ -374,6 +355,9 @@ export default function SavedMessagesSection({ isMobile }) {
   const [createErr,setCreateErr]= useState("");
   const [createOk, setCreateOk] = useState(false);
 
+  // ── NEW: search state ──────────────────────────────────────────────────────
+  const [search, setSearch] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     try   { setMessages(await fetchAll()); }
@@ -382,6 +366,11 @@ export default function SavedMessagesSection({ isMobile }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── NEW: filtered list ─────────────────────────────────────────────────────
+  const filteredMessages = messages.filter(m =>
+    m.message.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleCreate = useCallback(async (e) => {
     e.preventDefault();
@@ -499,8 +488,8 @@ export default function SavedMessagesSection({ isMobile }) {
 
         {/* ── Message list ── */}
         <div>
-          {/* Header */}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+          {/* Header with search */}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:10 }}>
             <p style={{ margin:0, fontSize:8, color:T.muted, letterSpacing:"0.2em", fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>
               Saved Messages
             </p>
@@ -515,12 +504,62 @@ export default function SavedMessagesSection({ isMobile }) {
                 fontFamily:  "'JetBrains Mono',monospace",
                 fontWeight:  600,
               }}>
-                {messages.length}
+                {filteredMessages.length}{search ? ` of ${messages.length}` : ""}
               </span>
               <GoldBtn variant="outline" onClick={load} style={{ padding:"5px 12px", fontSize:9 }}>
                 Refresh
               </GoldBtn>
             </div>
+          </div>
+
+          {/* ── NEW: Search bar ── */}
+          <div style={{ position:"relative", marginBottom:16 }}>
+            <span style={{
+              position:      "absolute",
+              left:          11,
+              top:           "50%",
+              transform:     "translateY(-50%)",
+              color:         T.muted,
+              pointerEvents: "none",
+              lineHeight:    1,
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+            </span>
+            <input
+              className="ops-focus"
+              type="text"
+              placeholder="Search messages…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                ...inputSx,
+                paddingLeft:  34,
+                borderRadius: 99,
+                fontSize:     12,
+              }}
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                style={{
+                  position:   "absolute",
+                  right:      10,
+                  top:        "50%",
+                  transform:  "translateY(-50%)",
+                  background: "none",
+                  border:     "none",
+                  color:      T.muted,
+                  cursor:     "pointer",
+                  fontSize:   14,
+                  lineHeight: 1,
+                  padding:    2,
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
 
           {/* Content */}
@@ -529,7 +568,7 @@ export default function SavedMessagesSection({ isMobile }) {
               <div style={{ width:28, height:28, borderRadius:"50%", border:`2px solid ${T.subtle}`, borderTopColor:T.gold, margin:"0 auto 12px", animation:"opsSpinner .8s linear infinite" }}/>
               Loading messages…
             </div>
-          ) : messages.length === 0 ? (
+          ) : filteredMessages.length === 0 ? (
             <div style={{
               padding:"52px 20px", textAlign:"center",
               background:   T.bgCard,
@@ -550,15 +589,15 @@ export default function SavedMessagesSection({ isMobile }) {
                 </svg>
               </div>
               <p style={{ margin:0, fontSize:14, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>
-                No Messages Yet
+                {search ? "No Messages Found" : "No Messages Yet"}
               </p>
               <p style={{ margin:"8px 0 0", fontSize:13, color:T.muted }}>
-                Save your first message using the form.
+                {search ? `No messages match "${search}".` : "Save your first message using the form."}
               </p>
             </div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {messages.map(msg => (
+              {filteredMessages.map(msg => (
                 <MessageCard
                   key={msg._id}
                   msg={msg}
