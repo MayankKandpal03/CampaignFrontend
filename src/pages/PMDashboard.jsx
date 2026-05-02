@@ -18,7 +18,7 @@ import {
   getNotificationPermission,
   triggerAlert,
   registerPushSubscription,
-} from "../utils/itNotifications.js";
+} from "../utils/notifications.js";
 import api                                 from "../api/axios.js";
 import OpsGlobalStyles      from "../components/common/OpsGlobalStyles.jsx";
 import GoldBtn              from "../components/common/GoldBtn.jsx";

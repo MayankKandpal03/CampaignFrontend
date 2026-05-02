@@ -39,7 +39,7 @@ import {
   triggerAlert,
   registerPushSubscription,
   unregisterPushSubscription,
-} from "../utils/itNotifications.js";
+} from "../utils/notifications.js";
 
 import "../styles/it.css";
 
