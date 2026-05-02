@@ -1,12 +1,11 @@
 // src/pages/ITDashboard.jsx
 /**
  * CHANGES FROM PREVIOUS VERSION:
- * 1. Added "history" nav item and section.
- * 2. History fetches GET /api/v1/campaign/history on section activation.
- * 3. Displays a 3-column table: PM NOTE · SCHEDULE TIME · IT NOTE.
- *    IT NOTE cell carries a subtle left-border colour (green = done, amber = not done)
- *    so the outcome is readable without needing a fourth column.
- * All prior behaviour is unchanged.
+ * 1. FIX: Added `dailytask:acked` socket handler — when IT user A acknowledges
+ *    a daily task, it is instantly removed from IT user B's queue.
+ * 2. FIX: `campaign:it_ack` handler now also updates history when section is open,
+ *    so acknowledged campaigns disappear from the queue for all IT users live.
+ * 3. History section carried over from last update (unchanged).
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -50,14 +49,11 @@ function NotifPermissionBanner({ permission, onRequest }) {
   const isDenied = permission === "denied";
   return (
     <div style={{
-      display:        "flex",
-      alignItems:     "center",
-      justifyContent: "space-between",
-      gap:            12,
-      padding:        "10px 28px",
-      background:     isDenied ? "var(--danger-lt)" : "var(--warn-lt)",
-      borderBottom:   `1px solid ${isDenied ? "rgba(184,48,48,0.2)" : "rgba(143,66,12,0.2)"}`,
-      flexWrap:       "wrap",
+      display:"flex", alignItems:"center", justifyContent:"space-between",
+      gap:12, padding:"10px 28px",
+      background:   isDenied ? "var(--danger-lt)" : "var(--warn-lt)",
+      borderBottom: `1px solid ${isDenied ? "rgba(184,48,48,0.2)" : "rgba(143,66,12,0.2)"}`,
+      flexWrap:"wrap",
     }}>
       <div style={{ display:"flex", alignItems:"center", gap:9 }}>
         <span style={{ fontSize:16 }}>{isDenied ? "🔕" : "🔔"}</span>
@@ -75,18 +71,10 @@ function NotifPermissionBanner({ permission, onRequest }) {
         </div>
       </div>
       {!isDenied && (
-        <button
-          onClick={onRequest}
-          style={{
-            padding:"7px 16px", borderRadius:"var(--radius-sm)",
-            border:"1.5px solid var(--warn)", background:"var(--warn-lt)",
-            color:"var(--warn)", fontFamily:"var(--ff-body)", fontSize:12,
-            fontWeight:600, cursor:"pointer", whiteSpace:"nowrap",
-            transition:"all 0.15s ease", flexShrink:0,
-          }}
+        <button onClick={onRequest}
+          style={{ padding:"7px 16px", borderRadius:"var(--radius-sm)", border:"1.5px solid var(--warn)", background:"var(--warn-lt)", color:"var(--warn)", fontFamily:"var(--ff-body)", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", transition:"all 0.15s ease", flexShrink:0 }}
           onMouseEnter={e => { e.currentTarget.style.background="var(--warn)"; e.currentTarget.style.color="#fff"; }}
-          onMouseLeave={e => { e.currentTarget.style.background="var(--warn-lt)"; e.currentTarget.style.color="var(--warn)"; }}
-        >
+          onMouseLeave={e => { e.currentTarget.style.background="var(--warn-lt)"; e.currentTarget.style.color="var(--warn)"; }}>
           Enable Notifications
         </button>
       )}
@@ -138,43 +126,20 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
   const isCampaign  = notif.type === "campaign";
   const accentColor = isCampaign ? "var(--accent)" : "var(--info)";
   const accentBg    = isCampaign ? "var(--accent-lt)" : "var(--info-lt)";
-
   return (
-    <div style={{
-      position:        "fixed",
-      inset:           0,
-      zIndex:          99999,
-      background:      "rgba(18,17,12,0.85)",
-      backdropFilter:  "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
-      display:         "flex",
-      alignItems:      "center",
-      justifyContent:  "center",
-      padding:         24,
-      animation:       "itOverlayIn 0.3s cubic-bezier(.22,1,.36,1) both",
-    }}>
+    <div style={{ position:"fixed", inset:0, zIndex:99999, background:"rgba(18,17,12,0.85)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, animation:"itOverlayIn 0.3s cubic-bezier(.22,1,.36,1) both" }}>
       <style>{`
-        @keyframes itOverlayIn  { from { opacity:0 } to { opacity:1 } }
-        @keyframes itCardIn     { from { opacity:0; transform:translateY(24px) scale(0.96) } to { opacity:1; transform:none } }
-        @keyframes itPulseRing  { 0%{transform:scale(1);opacity:.9} 70%{transform:scale(1.7);opacity:0} 100%{transform:scale(1.7);opacity:0} }
-        @keyframes itBounceIn   { 0%{transform:scale(.3)} 50%{transform:scale(1.07)} 70%{transform:scale(.96)} 100%{transform:scale(1)} }
+        @keyframes itOverlayIn { from{opacity:0}to{opacity:1} }
+        @keyframes itCardIn    { from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none} }
+        @keyframes itPulseRing { 0%{transform:scale(1);opacity:.9}70%{transform:scale(1.7);opacity:0}100%{transform:scale(1.7);opacity:0} }
+        @keyframes itBounceIn  { 0%{transform:scale(.3)}50%{transform:scale(1.07)}70%{transform:scale(.96)}100%{transform:scale(1)} }
       `}</style>
-
-      <div style={{
-        width:        "100%",
-        maxWidth:     500,
-        background:   "var(--surface)",
-        border:       `1px solid ${isCampaign ? "rgba(42,96,72,0.4)" : "rgba(26,79,110,0.4)"}`,
-        borderRadius: 20,
-        overflow:     "hidden",
-        boxShadow:    "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)",
-        animation:    "itCardIn 0.35s cubic-bezier(.22,1,.36,1) both",
-      }}>
-        <div style={{ height:4, background: isCampaign ? "linear-gradient(90deg,var(--accent),#3a7a5a)" : "linear-gradient(90deg,var(--info),#2a6a8e)" }}/>
+      <div style={{ width:"100%", maxWidth:500, background:"var(--surface)", border:`1px solid ${isCampaign?"rgba(42,96,72,0.4)":"rgba(26,79,110,0.4)"}`, borderRadius:20, overflow:"hidden", boxShadow:"0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05)", animation:"itCardIn .35s cubic-bezier(.22,1,.36,1) both" }}>
+        <div style={{ height:4, background: isCampaign?"linear-gradient(90deg,var(--accent),#3a7a5a)":"linear-gradient(90deg,var(--info),#2a6a8e)" }}/>
         <div style={{ padding:"24px 28px 18px", background:"var(--surface2)", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"flex-start", gap:16 }}>
           <div style={{ position:"relative", flexShrink:0 }}>
             <div style={{ position:"absolute", inset:0, borderRadius:"50%", background:accentBg, animation:"itPulseRing 1.6s ease-out infinite" }}/>
-            <div style={{ width:46, height:46, borderRadius:"50%", background:accentBg, border:`2px solid ${accentColor}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, position:"relative", animation:"itBounceIn 0.5s cubic-bezier(.22,1,.36,1) 0.1s both" }}>
+            <div style={{ width:46, height:46, borderRadius:"50%", background:accentBg, border:`2px solid ${accentColor}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, position:"relative", animation:"itBounceIn .5s cubic-bezier(.22,1,.36,1) .1s both" }}>
               {isCampaign ? "📋" : "🗓"}
             </div>
           </div>
@@ -182,54 +147,40 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
             <p style={{ margin:"0 0 4px", fontSize:10, fontFamily:"var(--ff-mono)", letterSpacing:"0.1em", textTransform:"uppercase", color:accentColor, fontWeight:600 }}>
               {isCampaign ? "🔴 New Task Assigned" : "⏰ Daily Task Due Now"}
             </p>
-            <h2 style={{ margin:"0 0 3px", fontSize:19, fontWeight:700, color:"var(--text)", fontFamily:"var(--ff-display)", letterSpacing:"-0.02em", lineHeight:1.2 }}>
-              {notif.title}
-            </h2>
+            <h2 style={{ margin:"0 0 3px", fontSize:19, fontWeight:700, color:"var(--text)", fontFamily:"var(--ff-display)", letterSpacing:"-0.02em", lineHeight:1.2 }}>{notif.title}</h2>
             <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
-              Received {new Date().toLocaleTimeString("en-IN", { hour:"2-digit", minute:"2-digit", hour12:true })}
-              {queueLength > 1 && (
-                <span style={{ marginLeft:8, padding:"1px 8px", borderRadius:99, background:"var(--danger-lt)", color:"var(--danger)", border:"1px solid rgba(184,48,48,0.2)", fontSize:10 }}>
-                  +{queueLength - 1} more waiting
-                </span>
-              )}
+              Received {new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true})}
+              {queueLength > 1 && <span style={{ marginLeft:8, padding:"1px 8px", borderRadius:99, background:"var(--danger-lt)", color:"var(--danger)", border:"1px solid rgba(184,48,48,.2)", fontSize:10 }}>+{queueLength-1} more waiting</span>}
             </p>
           </div>
         </div>
         <div style={{ padding:"20px 28px" }}>
           <div style={{ padding:"13px 16px", background:"var(--surface3)", border:"1px solid var(--border)", borderRadius:10, marginBottom:14 }}>
-            <p style={{ margin:"0 0 6px", fontSize:8, fontFamily:"var(--ff-mono)", letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--muted)" }}>
-              {isCampaign ? "PM Note / Message" : "Task Description"}
-            </p>
-            <p style={{ margin:0, fontSize:14, color:"var(--ink)", lineHeight:1.65, wordBreak:"break-word", fontFamily:"var(--ff-body)" }}>
-              {notif.body || "—"}
-            </p>
+            <p style={{ margin:"0 0 6px", fontSize:8, fontFamily:"var(--ff-mono)", letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--muted)" }}>{isCampaign?"PM Note / Message":"Task Description"}</p>
+            <p style={{ margin:0, fontSize:14, color:"var(--ink)", lineHeight:1.65, wordBreak:"break-word", fontFamily:"var(--ff-body)" }}>{notif.body||"—"}</p>
           </div>
-          <div style={{ display:"flex", alignItems:"flex-start", gap:9, padding:"10px 14px", background:"rgba(143,66,12,0.07)", border:"1px solid rgba(143,66,12,0.18)", borderRadius:8, marginBottom:20 }}>
+          <div style={{ display:"flex", alignItems:"flex-start", gap:9, padding:"10px 14px", background:"rgba(143,66,12,.07)", border:"1px solid rgba(143,66,12,.18)", borderRadius:8, marginBottom:20 }}>
             <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>⚠️</span>
-            <p style={{ margin:0, fontSize:12, color:"var(--warn)", lineHeight:1.55, fontFamily:"var(--ff-body)" }}>
-              This notification requires your attention. Acknowledge to confirm, or dismiss to handle it later from the queue.
-            </p>
+            <p style={{ margin:0, fontSize:12, color:"var(--warn)", lineHeight:1.55, fontFamily:"var(--ff-body)" }}>This notification requires your attention. Acknowledge to confirm, or dismiss to handle it later.</p>
           </div>
           <div style={{ display:"flex", gap:10 }}>
             <button onClick={onClose}
-              style={{ flex:1, padding:"12px", borderRadius:10, border:"1.5px solid var(--border2)", background:"none", fontFamily:"var(--ff-body)", fontSize:13, fontWeight:500, color:"var(--muted)", cursor:"pointer", transition:"all 0.15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.color="var(--ink)"; e.currentTarget.style.background="var(--surface2)"; }}
-              onMouseLeave={e => { e.currentTarget.style.color="var(--muted)"; e.currentTarget.style.background="none"; }}>
+              style={{ flex:1, padding:"12px", borderRadius:10, border:"1.5px solid var(--border2)", background:"none", fontFamily:"var(--ff-body)", fontSize:13, fontWeight:500, color:"var(--muted)", cursor:"pointer", transition:"all .15s ease" }}
+              onMouseEnter={e=>{e.currentTarget.style.color="var(--ink)";e.currentTarget.style.background="var(--surface2)";}}
+              onMouseLeave={e=>{e.currentTarget.style.color="var(--muted)";e.currentTarget.style.background="none";}}>
               Dismiss (handle later)
             </button>
             <button onClick={() => onAck(notif)}
-              style={{ flex:2, padding:"12px", borderRadius:10, border:"1.5px solid transparent", background: isCampaign ? "linear-gradient(135deg,var(--accent),#3a7a5a)" : "linear-gradient(135deg,var(--info),#2a6a8e)", fontFamily:"var(--ff-body)", fontSize:14, fontWeight:600, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all 0.15s ease", boxShadow:"0 4px 16px rgba(0,0,0,0.15)" }}
-              onMouseEnter={e => { e.currentTarget.style.opacity="0.9"; e.currentTarget.style.transform="translateY(-1px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity="1"; e.currentTarget.style.transform="none"; }}>
+              style={{ flex:2, padding:"12px", borderRadius:10, border:"1.5px solid transparent", background:isCampaign?"linear-gradient(135deg,var(--accent),#3a7a5a)":"linear-gradient(135deg,var(--info),#2a6a8e)", fontFamily:"var(--ff-body)", fontSize:14, fontWeight:600, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .15s ease", boxShadow:"0 4px 16px rgba(0,0,0,.15)" }}
+              onMouseEnter={e=>{e.currentTarget.style.opacity=".9";e.currentTarget.style.transform="translateY(-1px)";}}
+              onMouseLeave={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.transform="none";}}>
               <span style={{ fontSize:16 }}>✓</span> Acknowledge Now
             </button>
           </div>
         </div>
         <div style={{ padding:"10px 28px", background:"var(--surface2)", borderTop:"1px solid var(--border)", display:"flex", alignItems:"center", gap:6 }}>
           <span style={{ width:6, height:6, borderRadius:"50%", background:accentColor, animation:"itPulseRing 1.6s ease-out infinite", flexShrink:0 }}/>
-          <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
-            IT Portal · Campaign Management System
-          </p>
+          <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>IT Portal · Campaign Management System</p>
         </div>
       </div>
     </div>
@@ -237,12 +188,7 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
 }
 
 /* ─── History Table ───────────────────────────────────────────────────────── */
-/**
- * Pure presentational table — 3 columns only.
- * The IT NOTE cell carries a coloured left border so done vs not-done is
- * immediately scannable without a fourth column.
- */
-function HistoryTable({ records, loading, onRefresh, refreshing }) {
+function HistoryTable({ records, loading }) {
   if (loading) {
     return (
       <div className="table-empty">
@@ -251,7 +197,6 @@ function HistoryTable({ records, loading, onRefresh, refreshing }) {
       </div>
     );
   }
-
   if (records.length === 0) {
     return (
       <div className="table-empty">
@@ -260,7 +205,6 @@ function HistoryTable({ records, loading, onRefresh, refreshing }) {
       </div>
     );
   }
-
   return (
     <table>
       <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--surface2)" }}>
@@ -272,33 +216,19 @@ function HistoryTable({ records, loading, onRefresh, refreshing }) {
       </thead>
       <tbody>
         {records.map(c => {
-          const isDone   = c.acknowledgement === "done";
+          const isDone    = c.acknowledgement === "done";
           const noteColor = isDone ? "var(--accent)" : "var(--warn)";
-
           return (
             <tr key={c._id}>
-              {/* PM NOTE */}
               <td style={{ padding:"16px 18px", maxWidth:0, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.65, verticalAlign:"top" }}>
                 {c.pmMessage
                   ? <span style={{ fontSize:13, color:"var(--ink)", fontFamily:"var(--ff-body)" }}>{c.pmMessage}</span>
                   : <span style={{ fontSize:12, color:"var(--muted)", fontStyle:"italic" }}>No PM note</span>}
               </td>
-
-              {/* SCHEDULE TIME */}
               <td className="time-cell" style={{ padding:"16px 18px", verticalAlign:"top", whiteSpace:"nowrap" }}>
                 {c.scheduleAt ? fmt(c.scheduleAt) : "—"}
               </td>
-
-              {/* IT NOTE */}
-              <td style={{
-                padding:    "16px 18px",
-                maxWidth:   0,
-                verticalAlign:"top",
-                borderLeft: `3px solid ${noteColor}`,
-                wordBreak:  "break-word",
-                whiteSpace: "pre-wrap",
-                lineHeight: 1.65,
-              }}>
+              <td style={{ padding:"16px 18px", maxWidth:0, verticalAlign:"top", borderLeft:`3px solid ${noteColor}`, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.65 }}>
                 {c.itMessage
                   ? <span style={{ fontSize:13, color:"var(--ink)", fontFamily:"var(--ff-body)" }}>{c.itMessage}</span>
                   : <span style={{ fontSize:12, color:"var(--muted)", fontStyle:"italic" }}>No IT note</span>}
@@ -327,24 +257,23 @@ export default function ITDashboard() {
     _handleLogout();
   }, [_handleLogout]);
 
-  const [activeSection,   setActiveSection]   = useState("tasks");
-  const [sidebarOpen,     setSidebarOpen]     = useState(false);
-  const [showNotifs,      setShowNotifs]      = useState(false);
-  const [ackTarget,       setAckTarget]       = useState(null);
-  const [ackLoading,      setAckLoading]      = useState(false);
-  const [dailyTasks,      setDailyTasks]      = useState([]);
-  const [taskAckTarget,   setTaskAckTarget]   = useState(null);
-  const [taskAckLoading,  setTaskAckLoading]  = useState(false);
-  const [taskFetching,    setTaskFetching]    = useState(false);
-  const [toasts,          setToasts]          = useState([]);
-  const [refreshing,      setRefreshing]      = useState(false);
-  const [overlayQueue,    setOverlayQueue]    = useState([]);
-
-  // ── History state (NEW) ───────────────────────────────────────────────────
-  const [history,         setHistory]         = useState([]);
-  const [historyLoading,  setHistoryLoading]  = useState(false);
+  const [activeSection,     setActiveSection]     = useState("tasks");
+  const [sidebarOpen,       setSidebarOpen]       = useState(false);
+  const [showNotifs,        setShowNotifs]        = useState(false);
+  const [ackTarget,         setAckTarget]         = useState(null);
+  const [ackLoading,        setAckLoading]        = useState(false);
+  const [dailyTasks,        setDailyTasks]        = useState([]);
+  const [taskAckTarget,     setTaskAckTarget]     = useState(null);
+  const [taskAckLoading,    setTaskAckLoading]    = useState(false);
+  const [taskFetching,      setTaskFetching]      = useState(false);
+  const [toasts,            setToasts]            = useState([]);
+  const [refreshing,        setRefreshing]        = useState(false);
+  const [overlayQueue,      setOverlayQueue]      = useState([]);
+  const [history,           setHistory]           = useState([]);
+  const [historyLoading,    setHistoryLoading]    = useState(false);
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
 
+  // ── History fetch ─────────────────────────────────────────────────────────
   const fetchHistory = useCallback(async (showSpinner = true) => {
     if (showSpinner) setHistoryLoading(true); else setHistoryRefreshing(true);
     try {
@@ -358,7 +287,6 @@ export default function ITDashboard() {
     }
   }, []);
 
-  // Load history when the section is first activated
   useEffect(() => {
     if (activeSection === "history") fetchHistory();
   }, [activeSection, fetchHistory]);
@@ -373,7 +301,6 @@ export default function ITDashboard() {
     }
   }, [notifPermission]);
 
-  // ── Close NotifPanel on outside click ─────────────────────────────────────
   const notifBellRef = useRef(null);
   useEffect(() => {
     if (!showNotifs) return;
@@ -416,11 +343,8 @@ export default function ITDashboard() {
     bcRef.current?.postMessage({ type: "overlay_push", notif: entry });
   }, []);
 
-  const dismissOverlay = useCallback(() => {
-    setOverlayQueue(prev => prev.slice(1));
-  }, []);
-
-  const ackFromOverlay = useCallback((notif) => {
+  const dismissOverlay  = useCallback(() => setOverlayQueue(prev => prev.slice(1)), []);
+  const ackFromOverlay  = useCallback((notif) => {
     dismissOverlay();
     if (notif.type === "campaign") setAckTarget(notif.item);
     else if (notif.type === "task") setTaskAckTarget(notif.item);
@@ -483,7 +407,11 @@ export default function ITDashboard() {
     "campaign:it_queued": c => {
       useCampaignStore.setState(s => {
         const exists = s.campaigns.some(x => x._id === c._id);
-        return { campaigns: exists ? s.campaigns.map(x => x._id === c._id ? c : x) : [c, ...s.campaigns] };
+        return {
+          campaigns: exists
+            ? s.campaigns.map(x => x._id === c._id ? c : x)
+            : [c, ...s.campaigns],
+        };
       });
       const msgPreview = (c.pmMessage || c.message || "New task assigned").slice(0, 120);
       addNotification(`📋 New campaign in queue: "${msgPreview}${msgPreview.length >= 120 ? "…" : ""}"`);
@@ -494,26 +422,46 @@ export default function ITDashboard() {
         item:  c,
       });
     },
+
     "campaign:updated": c => {
-      useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id === c._id ? c : x) }));
+      useCampaignStore.setState(s => ({
+        campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
+      }));
     },
+
+    /**
+     * FIX: Handles both cases:
+     * A) This IT user just acknowledged — store already updated locally, this
+     *    is the echo from the server, harmless double-patch.
+     * B) ANOTHER IT user acknowledged — patches this user's store so the
+     *    campaign disappears from itCampaigns (filtered by acknowledgement field).
+     */
     "campaign:it_ack": c => {
-      useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id === c._id ? c : x) }));
-      // Prepend to history if the section is open
-      if (activeSection === "history") {
-        setHistory(prev => {
-          const exists = prev.some(x => x._id === c._id);
-          if (exists) return prev.map(x => x._id === c._id ? c : x);
-          return [c, ...prev];
-        });
-      }
+      useCampaignStore.setState(s => ({
+        campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
+      }));
+      // Keep history in sync if the tab is open
+      setHistory(prev => {
+        if (prev.length === 0) return prev; // history not loaded yet — skip
+        const exists = prev.some(x => x._id === c._id);
+        if (exists) return prev.map(x => x._id === c._id ? c : x);
+        return [c, ...prev];
+      });
     },
+
     "campaign:deleted": d => {
-      useCampaignStore.setState(s => ({ campaigns: s.campaigns.filter(x => x._id !== d._id) }));
+      useCampaignStore.setState(s => ({
+        campaigns: s.campaigns.filter(x => x._id !== d._id),
+      }));
     },
+
     "campaign:schedule_fired": c => {
-      useCampaignStore.setState(s => ({ campaigns: s.campaigns.map(x => x._id === c._id ? c : x) }));
+      useCampaignStore.setState(s => ({
+        campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
+      }));
     },
+
+    // New daily task pushed by the server timer
     "dailytask:queued": task => {
       setDailyTasks(prev => {
         const exists = prev.some(t => String(t._id) === String(task._id));
@@ -527,6 +475,18 @@ export default function ITDashboard() {
         body:  task.task?.slice(0, 200) || "A scheduled daily task requires your acknowledgement.",
         item:  task,
       });
+    },
+
+    /**
+     * FIX: dailytask:acked is now emitted to room:it by the backend.
+     * When IT user A acknowledges a daily task the server broadcasts this event
+     * to all IT sockets. IT user B receives it here and removes the task from
+     * their queue immediately — no manual refresh required.
+     */
+    "dailytask:acked": t => {
+      setDailyTasks(prev =>
+        prev.filter(task => String(task._id) !== String(t._id))
+      );
     },
   });
 
@@ -586,6 +546,7 @@ export default function ITDashboard() {
     setTaskAckLoading(true);
     try {
       await api.post("/task/acknowledge", { id: taskId, message });
+      // Remove locally for the acting user right away
       setDailyTasks(prev => prev.filter(t => String(t._id) !== String(taskId)));
       setTaskAckTarget(null);
       pushToast("Daily task acknowledged. PMs notified.");
@@ -597,44 +558,36 @@ export default function ITDashboard() {
 
   // ── Nav ───────────────────────────────────────────────────────────────────
   const NAV_ITEMS = [
-    { id:"tasks",          label:"Tasks",          icon:"📋", count: pendingCount       },
-    { id:"schedule-tasks", label:"Schedule Tasks", icon:"🗓", count: dailyTasks.length  },
-    { id:"history",        label:"History",        icon:"🕓", count: history.length     }, // ← NEW
+    { id:"tasks",          label:"Tasks",          icon:"📋", count: pendingCount      },
+    { id:"schedule-tasks", label:"Schedule Tasks", icon:"🗓", count: dailyTasks.length },
+    { id:"history",        label:"History",        icon:"🕓", count: history.length    },
   ];
 
   return (
     <div className="it-root" style={{ height:"100vh", overflow:"hidden" }}>
-      <div className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sidebar-overlay ${sidebarOpen?"show":""}`} onClick={() => setSidebarOpen(false)}/>
 
       {/* ── Sidebar ── */}
-      <aside className={`it-sidebar ${sidebarOpen ? "mobile-open" : ""}`}>
+      <aside className={`it-sidebar ${sidebarOpen?"mobile-open":""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-name">Task<i style={{ fontStyle:"normal", opacity:0.4 }}>.</i></div>
+          <div className="sidebar-brand-name">Task<i style={{ fontStyle:"normal", opacity:.4 }}>.</i></div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
         <div className="sidebar-user">
-          <div className="user-avatar">{initials(user || "IT")}</div>
+          <div className="user-avatar">{initials(user||"IT")}</div>
           <div>
-            <div className="user-info-name">{user || "IT User"}</div>
+            <div className="user-info-name">{user||"IT User"}</div>
             <div className="user-info-role">{role}</div>
           </div>
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
-            <button
-              key={item.id}
-              className={`nav-item ${activeSection === item.id ? "active" : ""}`}
-              onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}
-            >
+            <button key={item.id} className={`nav-item ${activeSection===item.id?"active":""}`}
+              onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}>
               <span className="nav-icon">{item.icon}</span>
               <span style={{ flex:1 }}>{item.label}</span>
               {item.count > 0 && (
-                <span style={{
-                  padding:"1px 7px", borderRadius:99,
-                  background: activeSection === item.id ? "var(--accent)" : "var(--surface3)",
-                  color:      activeSection === item.id ? "#fff"          : "var(--muted)",
-                  fontSize:10, fontFamily:"var(--ff-mono)", fontWeight:700,
-                }}>
+                <span style={{ padding:"1px 7px", borderRadius:99, background: activeSection===item.id?"var(--accent)":"var(--surface3)", color: activeSection===item.id?"#fff":"var(--muted)", fontSize:10, fontFamily:"var(--ff-mono)", fontWeight:700 }}>
                   {item.count}
                 </span>
               )}
@@ -642,55 +595,40 @@ export default function ITDashboard() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button className="logout-btn" onClick={handleLogout}>
-            <span>↩</span> Sign Out
-          </button>
+          <button className="logout-btn" onClick={handleLogout}><span>↩</span> Sign Out</button>
         </div>
       </aside>
 
       {/* ── Main ── */}
       <div className="it-main" style={{ display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-        <NotifPermissionBanner permission={notifPermission} onRequest={handleRequestPermission} />
+        <NotifPermissionBanner permission={notifPermission} onRequest={handleRequestPermission}/>
 
         {/* ── Header ── */}
         <header className="it-header">
           <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
             <span/><span/><span/>
           </button>
-
           <h1 className="header-title">
-            {activeSection === "tasks"          && "Scheduled Campaigns"}
-            {activeSection === "schedule-tasks" && "Schedule Tasks"}
-            {activeSection === "history"        && "Acknowledgement History"}
+            {activeSection==="tasks"          && "Scheduled Campaigns"}
+            {activeSection==="schedule-tasks" && "Schedule Tasks"}
+            {activeSection==="history"        && "Acknowledgement History"}
           </h1>
-
           <span className="header-badge">
-            {activeSection === "tasks"          && `${pendingCount} Pending`}
-            {activeSection === "schedule-tasks" && `${dailyTasks.length} Due`}
-            {activeSection === "history"        && `${history.length} Records`}
+            {activeSection==="tasks"          && `${pendingCount} Pending`}
+            {activeSection==="schedule-tasks" && `${dailyTasks.length} Due`}
+            {activeSection==="history"        && `${history.length} Records`}
           </span>
 
-          {/* ── Notification Bell ── */}
+          {/* Notification Bell */}
           <div style={{ position:"relative" }} ref={notifBellRef}>
             <button
               onClick={() => { setShowNotifs(v => !v); if (!showNotifs) markRead(); }}
               title={`${unread} unread notifications`}
-              style={{
-                width:46, height:36, borderRadius:"var(--radius-sm)",
-                border:     showNotifs ? "1.5px solid var(--accent)" : "1px solid var(--border)",
-                background: showNotifs ? "var(--accent-lt)"          : "var(--surface)",
-                cursor:     "pointer",
-                display:    "flex", alignItems:"center", justifyContent:"center",
-                transition: "all 0.18s ease", position:"relative", flexShrink:0,
-                boxShadow:  showNotifs ? "0 2px 8px rgba(42,96,72,0.15)" : "var(--shadow-sm)",
-              }}
-              onMouseEnter={e => { if (!showNotifs) { e.currentTarget.style.borderColor = "var(--border2)"; e.currentTarget.style.background = "var(--surface2)"; } }}
-              onMouseLeave={e => { if (!showNotifs) { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; } }}
-              aria-label="Notifications"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke={showNotifs ? "var(--accent)" : "var(--muted)"} strokeWidth="2">
+              style={{ width:46, height:36, borderRadius:"var(--radius-sm)", border: showNotifs?"1.5px solid var(--accent)":"1px solid var(--border)", background: showNotifs?"var(--accent-lt)":"var(--surface)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .18s ease", position:"relative", flexShrink:0, boxShadow: showNotifs?"0 2px 8px rgba(42,96,72,.15)":"var(--shadow-sm)" }}
+              onMouseEnter={e => { if (!showNotifs) { e.currentTarget.style.borderColor="var(--border2)"; e.currentTarget.style.background="var(--surface2)"; } }}
+              onMouseLeave={e => { if (!showNotifs) { e.currentTarget.style.borderColor="var(--border)"; e.currentTarget.style.background="var(--surface)"; } }}
+              aria-label="Notifications">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={showNotifs?"var(--accent)":"var(--muted)"} strokeWidth="2">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
               </svg>
               {unread > 0 && (
@@ -702,12 +640,12 @@ export default function ITDashboard() {
                 <span style={{ position:"absolute", top:-4, right:-4, width:10, height:10, borderRadius:"50%", background:"var(--warn)", border:"2px solid var(--bg)" }}/>
               )}
             </button>
-            <ITNotifPanel open={showNotifs} onClose={() => setShowNotifs(false)} width={310} />
+            <ITNotifPanel open={showNotifs} onClose={() => setShowNotifs(false)} width={310}/>
           </div>
         </header>
 
-        {/* ══════════════ CAMPAIGNS ══════════════ */}
-        {activeSection === "tasks" && (
+        {/* ══════ CAMPAIGNS ══════ */}
+        {activeSection==="tasks" && (
           <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Request Queue</span>
@@ -724,27 +662,17 @@ export default function ITDashboard() {
               ) : (
                 <table>
                   <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--surface2)" }}>
-                    <tr>
-                      <th>PM Note</th>
-                      <th>Scheduled At</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                      <th>Acknowledge</th>
-                    </tr>
+                    <tr><th>PM Note</th><th>Scheduled At</th><th>Status</th><th>Action</th><th>Acknowledge</th></tr>
                   </thead>
                   <tbody>
                     {itCampaigns.map(c => (
                       <tr key={c._id}>
-                        <td style={{ maxWidth:320, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.6, padding:"16px 18px" }}>
-                          {c.pmMessage || "—"}
-                        </td>
+                        <td style={{ maxWidth:320, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.6, padding:"16px 18px" }}>{c.pmMessage||"—"}</td>
                         <td className="time-cell" style={{ padding:"16px 18px" }}>{fmt(c.scheduleAt)}</td>
                         <td style={{ padding:"16px 18px" }}><StatusBadge value={c.status}/></td>
                         <td style={{ padding:"16px 18px" }}><StatusBadge value={c.action}/></td>
                         <td style={{ padding:"16px 18px" }}>
-                          <button className="ack-btn" onClick={() => setAckTarget(c)}>
-                            ✓ Acknowledge
-                          </button>
+                          <button className="ack-btn" onClick={() => setAckTarget(c)}>✓ Acknowledge</button>
                         </td>
                       </tr>
                     ))}
@@ -755,8 +683,8 @@ export default function ITDashboard() {
           </div>
         )}
 
-        {/* ══════════════ SCHEDULE TASKS ══════════════ */}
-        {activeSection === "schedule-tasks" && (
+        {/* ══════ SCHEDULE TASKS ══════ */}
+        {activeSection==="schedule-tasks" && (
           <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Today's Task Queue</span>
@@ -766,39 +694,24 @@ export default function ITDashboard() {
             </div>
             <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
               {taskFetching ? (
-                <div className="table-empty">
-                  <div className="table-empty-icon" style={{ fontSize:28 }}>⏳</div>
-                  <div className="table-empty-text">Loading tasks…</div>
-                </div>
+                <div className="table-empty"><div className="table-empty-icon" style={{ fontSize:28 }}>⏳</div><div className="table-empty-text">Loading tasks…</div></div>
               ) : dailyTasks.length === 0 ? (
-                <div className="table-empty">
-                  <div className="table-empty-icon">✅</div>
-                  <div className="table-empty-text">No tasks due right now. Check back at the scheduled times.</div>
-                </div>
+                <div className="table-empty"><div className="table-empty-icon">✅</div><div className="table-empty-text">No tasks due right now. Check back at the scheduled times.</div></div>
               ) : (
                 <table>
                   <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--surface2)" }}>
-                    <tr>
-                      <th>Task</th>
-                      <th>Scheduled Time</th>
-                      <th>Created By</th>
-                      <th>Acknowledge</th>
-                    </tr>
+                    <tr><th>Task</th><th>Scheduled Time</th><th>Created By</th><th>Acknowledge</th></tr>
                   </thead>
                   <tbody>
                     {dailyTasks.map(t => {
-                      const creatorName = typeof t.createdBy === "object" ? t.createdBy?.username : "PM";
+                      const creatorName = typeof t.createdBy==="object" ? t.createdBy?.username : "PM";
                       return (
                         <tr key={t._id}>
-                          <td style={{ maxWidth:400, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.6, padding:"16px 18px" }}>
-                            {t.task}
-                          </td>
+                          <td style={{ maxWidth:400, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.6, padding:"16px 18px" }}>{t.task}</td>
                           <td className="time-cell" style={{ padding:"16px 18px" }}>{t.time}</td>
                           <td style={{ padding:"16px 18px", fontSize:13 }}>{creatorName}</td>
                           <td style={{ padding:"16px 18px" }}>
-                            <button className="ack-btn" onClick={() => setTaskAckTarget(t)}>
-                              ✓ Acknowledge
-                            </button>
+                            <button className="ack-btn" onClick={() => setTaskAckTarget(t)}>✓ Acknowledge</button>
                           </td>
                         </tr>
                       );
@@ -810,94 +723,39 @@ export default function ITDashboard() {
           </div>
         )}
 
-        {/* ══════════════ HISTORY (NEW) ══════════════ */}
-        {activeSection === "history" && (
+        {/* ══════ HISTORY ══════ */}
+        {activeSection==="history" && (
           <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-            {/* Legend */}
-            <div style={{
-              display:      "flex",
-              alignItems:   "center",
-              gap:          20,
-              marginBottom: 16,
-              padding:      "10px 16px",
-              background:   "var(--surface2)",
-              border:       "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              flexShrink:   0,
-              flexWrap:     "wrap",
-            }}>
-              <span style={{ fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
-                IT NOTE border colour:
-              </span>
+            <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16, padding:"10px 16px", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"var(--radius-sm)", flexShrink:0, flexWrap:"wrap" }}>
+              <span style={{ fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>IT NOTE border colour:</span>
               <span style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontFamily:"var(--ff-body)", color:"var(--accent)" }}>
-                <span style={{ display:"inline-block", width:3, height:14, background:"var(--accent)", borderRadius:2 }}/>
-                Done
+                <span style={{ display:"inline-block", width:3, height:14, background:"var(--accent)", borderRadius:2 }}/>Done
               </span>
               <span style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontFamily:"var(--ff-body)", color:"var(--warn)" }}>
-                <span style={{ display:"inline-block", width:3, height:14, background:"var(--warn)", borderRadius:2 }}/>
-                Not Done
+                <span style={{ display:"inline-block", width:3, height:14, background:"var(--warn)", borderRadius:2 }}/>Not Done
               </span>
             </div>
-
             <div className="section-head" style={{ flexShrink:0 }}>
               <span className="section-title">Acknowledgement History</span>
-              <button
-                className="refresh-btn"
-                onClick={() => fetchHistory(false)}
-                disabled={historyRefreshing}
-              >
+              <button className="refresh-btn" onClick={() => fetchHistory(false)} disabled={historyRefreshing}>
                 {historyRefreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
-
             <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
-              <HistoryTable
-                records={history}
-                loading={historyLoading}
-                onRefresh={() => fetchHistory(false)}
-                refreshing={historyRefreshing}
-              />
+              <HistoryTable records={history} loading={historyLoading}/>
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Ack modals ── */}
-      {ackTarget && (
-        <AckModal
-          campaign={ackTarget}
-          onClose={() => setAckTarget(null)}
-          onConfirm={handleAck}
-          loading={ackLoading}
-        />
-      )}
-      {taskAckTarget && (
-        <TaskAckModal
-          task={taskAckTarget}
-          onClose={() => setTaskAckTarget(null)}
-          onConfirm={handleTaskAck}
-          loading={taskAckLoading}
-        />
-      )}
+      {/* ── Modals ── */}
+      {ackTarget     && <AckModal campaign={ackTarget} onClose={() => setAckTarget(null)} onConfirm={handleAck} loading={ackLoading}/>}
+      {taskAckTarget && <TaskAckModal task={taskAckTarget} onClose={() => setTaskAckTarget(null)} onConfirm={handleTaskAck} loading={taskAckLoading}/>}
 
-      {/* Persistent overlay */}
-      {currentOverlay && (
-        <OverlayNotif
-          notif={currentOverlay}
-          queueLength={overlayQueue.length}
-          onClose={dismissOverlay}
-          onAck={ackFromOverlay}
-        />
-      )}
+      {currentOverlay && <OverlayNotif notif={currentOverlay} queueLength={overlayQueue.length} onClose={dismissOverlay} onAck={ackFromOverlay}/>}
 
-      {/* ── Toasts ── */}
       <div className="toast-container">
-        {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.type === "warn" ? "warn" : ""}`}>
-            {t.msg}
-          </div>
-        ))}
+        {toasts.map(t => <div key={t.id} className={`toast ${t.type==="warn"?"warn":""}`}>{t.msg}</div>)}
       </div>
     </div>
   );
