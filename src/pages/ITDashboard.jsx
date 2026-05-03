@@ -25,6 +25,14 @@
  *    campaign:it_queued and dailytask:queued socket handlers, matching the
  *    same pattern used by PMDashboard. Previously only pushOverlay was called,
  *    which could silently fail without triggering any OS/sound notification.
+ *
+ * 5. FIX (Push re-registration) — Push useEffect now uses [] as dependency so
+ *    it fires on every mount, not only when permission changes. This ensures
+ *    the subscription is re-registered after server restarts (which clear the
+ *    in-memory subscriptions Map) without requiring the user to grant permission
+ *    again. The old [notifPermission] dep meant a user whose permission was
+ *    already "granted" from a previous session would never re-subscribe after
+ *    a server restart, silently dropping all IT push notifications.
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -315,13 +323,18 @@ export default function ITDashboard() {
 
   // ── Notification permission ────────────────────────────────────────────────
   const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
+
+  // FIX: Use [] so push re-registers on every mount, not only when permission
+  // state changes. The server's in-memory subscriptions Map is cleared on every
+  // restart; without this fix, IT users already holding "granted" permission
+  // would never re-subscribe after a deploy — identical to the PM dashboard fix.
   useEffect(() => {
-    if (notifPermission === "granted") {
+    if (getNotificationPermission() === "granted") {
       registerPushSubscription().catch(err =>
         console.warn("[Push] Registration failed:", err.message)
       );
     }
-  }, [notifPermission]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const notifBellRef = useRef(null);
   useEffect(() => {
