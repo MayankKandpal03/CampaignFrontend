@@ -346,7 +346,7 @@ export default function ITDashboard() {
       setOverlayQueue(prev =>
         prev.some(n => n.id === notif.id) ? prev : [...prev, notif]
       );
-      import("../utils/itNotifications.js").then(m => m.playNotificationSound());
+      import("../utils/notifications.js").then(m => m.playNotificationSound());
     };
     return () => { bc.close(); bcRef.current = null; };
   }, []);
