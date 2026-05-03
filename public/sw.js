@@ -1,59 +1,87 @@
 // public/sw.js
-//
-// DUPLICATE PREVENTION:
-//   When the tab is open and focused, the socket event fires triggerAlert
-//   which shows a native OS notification directly.
-//   This SW push handler checks if any client is focused — if yes, it skips
-//   showing the push notification to avoid showing two OS alerts.
-//
-//   Tab FOCUSED  → skip push notification (triggerAlert handles it)
-//   Tab VISIBLE but not focused → show push notification
-//   Tab HIDDEN / CLOSED         → show push notification
+// Service worker for push notifications.
+// Place this file at: public/sw.js (Vite serves public/ at the root)
+
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 self.addEventListener("push", (event) => {
-  const data = event.data?.json() ?? {};
+  if (!event.data) return;
+
+  let data = {};
+  try {
+    data = event.data.json();
+  } catch {
+    data = { title: "Notification", body: event.data.text() };
+  }
+
+  const title = data.title || "Notification";
+  const options = {
+    body:               data.body              || "",
+    icon:               data.icon              || "/favicon.ico",
+    badge:              data.badge             || "/favicon.ico",
+    tag:                data.tag               || `notif-${Date.now()}`,
+    renotify:           true,
+    requireInteraction: true,
+    silent:             false,
+    data: {
+      url:  data.url  || "/",
+      role: data.role || "",
+    },
+  };
 
   event.waitUntil(
-    clients
+    self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        // If any tab is focused, triggerAlert (socket path) handles the OS notification
-        const anyFocused = clientList.some((c) => c.focused);
-        if (anyFocused) return; // skip — no duplicate
+      .then((clients) => {
+        // If any tab for this origin is currently focused, suppress the OS
+        // notification — the tab's own triggerAlert() already handled it.
+        const hasFocusedClient = clients.some((c) => c.focused);
+        if (hasFocusedClient) return Promise.resolve();
 
-        return self.registration.showNotification(data.title || "New Notification", {
-          body:               data.body  || "",
-          icon:               "/favicon.ico",
-          badge:              "/favicon.ico",
-          tag:                data.tag   || "portal-default",
-          renotify:           true,
-          requireInteraction: true,
-          data:               { url: data.url || "/" },
-        });
+        return self.registration.showNotification(title, options);
       })
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
+
+  const targetUrl = event.notification.data?.url || "/";
 
   event.waitUntil(
-    clients
+    self.clients
       .matchAll({ type: "window", includeUncontrolled: true })
-      .then((clientList) => {
-        // Focus existing tab if it matches the target URL
-        for (const client of clientList) {
-          if (client.url.includes(url) && "focus" in client) {
-            return client.focus();
-          }
+      .then((clients) => {
+        // Focus an existing tab whose URL matches
+        const match = clients.find(
+          (c) => new URL(c.url).pathname === targetUrl && "focus" in c
+        );
+        if (match) return match.focus();
+
+        // Focus any open tab for this app
+        const anyTab = clients.find((c) => "focus" in c);
+        if (anyTab) {
+          anyTab.focus();
+          return anyTab.navigate(targetUrl);
         }
-        // Otherwise open a new tab
-        return clients.openWindow(url);
+
+        // No open tab — open a new one
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
+        }
       })
   );
 });
 
-// Keep SW alive / updated immediately
-self.addEventListener("install",  () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(clients.claim()));
+self.addEventListener("pushsubscriptionchange", (event) => {
+  // Re-subscribe automatically when the browser rotates the push subscription.
+  // The frontend will re-call /push/subscribe on next load, so this is a
+  // best-effort silent handler to avoid unhandled-event warnings in DevTools.
+  event.waitUntil(Promise.resolve());
+});

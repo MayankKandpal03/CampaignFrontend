@@ -20,6 +20,11 @@
  *    triggerAlert in itNotifications.js no longer calls showNativeNotification.
  *    The service-worker push handles OS alerts; the overlay card handles
  *    in-tab visual feedback.  No changes required in this file for that fix.
+ *
+ * 4. FIX (IT notifications) — triggerAlert now called directly in
+ *    campaign:it_queued and dailytask:queued socket handlers, matching the
+ *    same pattern used by PMDashboard. Previously only pushOverlay was called,
+ *    which could silently fail without triggering any OS/sound notification.
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -287,20 +292,6 @@ export default function ITDashboard() {
   const [historyLoading,    setHistoryLoading]    = useState(false);
   const [historyRefreshing, setHistoryRefreshing] = useState(false);
 
-  /**
-   * FIX (Issue 2): Track whether history has been fetched at least once.
-   *
-   * The old guard was:
-   *   if (prev.length === 0) return prev;
-   *
-   * That cannot distinguish "not yet fetched" from "fetched but empty".
-   * When history was empty and the first acknowledgement came in via the
-   * campaign:it_ack socket event, the guard silently dropped the update,
-   * leaving the history section blank until the user manually refreshed.
-   *
-   * Using a ref instead lets us correctly update history even when the
-   * list is genuinely empty after being loaded.
-   */
   const historyLoadedRef = useRef(false);
 
   // ── History fetch ─────────────────────────────────────────────────────────
@@ -309,7 +300,6 @@ export default function ITDashboard() {
     try {
       const res = await api.get("/campaign/history");
       setHistory(res.data?.data ?? []);
-      // Mark history as loaded so socket updates are accepted from now on
       historyLoadedRef.current = true;
     } catch (err) {
       console.error("Failed to fetch IT history:", err);
@@ -370,7 +360,6 @@ export default function ITDashboard() {
 
   const pushOverlay = useCallback((notif) => {
     const entry = { ...notif, id: Date.now() + Math.random() };
-    triggerAlert(entry.title, entry.body, () => { try { window.focus(); } catch { /* ignore */ } });
     setOverlayQueue(prev => [...prev, entry]);
     bcRef.current?.postMessage({ type: "overlay_push", notif: entry });
   }, []);
@@ -448,6 +437,13 @@ export default function ITDashboard() {
       });
       const msgPreview = (c.pmMessage || c.message || "New task assigned").slice(0, 120);
       addNotification(`📋 New campaign in queue: "${msgPreview}${msgPreview.length >= 120 ? "…" : ""}"`);
+
+      // FIX: call triggerAlert directly (sound + OS notification) — same as PMDashboard
+      triggerAlert(
+        "New Task Assigned",
+        c.pmMessage || c.message?.slice(0, 200) || "A new campaign requires your acknowledgement.",
+      );
+
       pushOverlay({
         type:  "campaign",
         title: "New Task Assigned",
@@ -462,27 +458,10 @@ export default function ITDashboard() {
       }));
     },
 
-    /**
-     * campaign:it_ack
-     *
-     * FIX (Issue 2): history update now uses historyLoadedRef instead of
-     * checking prev.length === 0.
-     *
-     * Case A — this IT user just acknowledged: store is already up-to-date
-     *   locally; this is the server echo. Harmless double-patch.
-     * Case B — ANOTHER IT user acknowledged: patches this user's store so the
-     *   campaign is removed from itCampaigns (filtered by acknowledgement).
-     *
-     * History update: previously guarded by `prev.length === 0` which meant
-     * the first ever acknowledgement never appeared live in an empty history
-     * list. Now correctly guarded by historyLoadedRef.current which is true
-     * as soon as fetchHistory() completes, regardless of record count.
-     */
     "campaign:it_ack": c => {
       useCampaignStore.setState(s => ({
         campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
       }));
-      // Update history only if the history tab has been loaded at least once
       if (historyLoadedRef.current) {
         setHistory(prev => {
           const exists = prev.some(x => x._id === c._id);
@@ -505,7 +484,6 @@ export default function ITDashboard() {
     },
 
     // ── Daily tasks ────────────────────────────────────────────────────────
-    // New daily task pushed by the server timer — add to queue for all IT
     "dailytask:queued": task => {
       setDailyTasks(prev => {
         const exists = prev.some(t => String(t._id) === String(task._id));
@@ -513,6 +491,13 @@ export default function ITDashboard() {
       });
       const taskPreview = (task.task || "Daily task needs acknowledgement").slice(0, 100);
       addNotification(`🗓 Daily task due: "${taskPreview}${taskPreview.length >= 100 ? "…" : ""}"`);
+
+      // FIX: call triggerAlert directly (sound + OS notification) — same as PMDashboard
+      triggerAlert(
+        "Daily Task Due Now",
+        task.task?.slice(0, 200) || "A scheduled daily task requires your acknowledgement.",
+      );
+
       pushOverlay({
         type:  "task",
         title: "Daily Task Due Now",
@@ -521,11 +506,6 @@ export default function ITDashboard() {
       });
     },
 
-    /**
-     * dailytask:acked
-     * Emitted by the backend to room:it so every connected IT user removes
-     * the acknowledged task from their queue immediately without a refresh.
-     */
     "dailytask:acked": t => {
       setDailyTasks(prev =>
         prev.filter(task => String(task._id) !== String(t._id))
@@ -589,7 +569,6 @@ export default function ITDashboard() {
     setTaskAckLoading(true);
     try {
       await api.post("/task/acknowledge", { id: taskId, message });
-      // Remove locally for the acting user right away
       setDailyTasks(prev => prev.filter(t => String(t._id) !== String(taskId)));
       setTaskAckTarget(null);
       pushToast("Daily task acknowledged. PMs notified.");

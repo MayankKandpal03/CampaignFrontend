@@ -1,7 +1,13 @@
 // src/pages/PMDashboard.jsx
 // CHANGES:
 //  - Added "saved-messages" nav item + section render.
-//  - All prior behaviour unchanged.
+//  - FIX: Push registration useEffect now uses [] as dependency array so it
+//    fires on every mount, not only when permission changes. This ensures
+//    the subscription is re-registered after server restarts (which clear the
+//    in-memory subscriptions Map) without requiring the user to grant permission
+//    again. The old [notifPermission] dep meant a user whose permission was
+//    already "granted" from a previous session would never re-subscribe after
+//    a server restart, silently dropping all push notifications.
 import { useEffect, useState, useCallback, useMemo } from "react";
 import useAuthStore  from "../stores/useAuthStore.js";
 import useNotifStore from "../stores/useNotificationStore.js";
@@ -30,7 +36,7 @@ import CampaignsTable       from "../components/campaigns/CampaignsTable.jsx";
 import DeleteUserModal      from "../components/users/DeleteUserModal.jsx";
 import CreateUserForm       from "../components/users/CreateUserForm.jsx";
 import PMUserSection        from "../components/users/PMUserSection.jsx";
-import SavedMessagesSection from "../components/messages/SavedMessagesSection.jsx"; // ← NEW
+import SavedMessagesSection from "../components/messages/SavedMessagesSection.jsx";
 
 export default function PMDashboard() {
   const user            = useAuthStore(s => s.user);
@@ -58,13 +64,17 @@ export default function PMDashboard() {
   const [taskOk,         setTaskOk]         = useState(false);
   const [deactivatingId, setDeactivatingId] = useState(null);
 
+  // FIX: Register push subscription on every mount, not only when the
+  // permission state changes. The server's in-memory subscriptions Map is
+  // cleared on every restart; without this fix, users already holding
+  // "granted" permission would never re-subscribe after a deploy.
   useEffect(() => {
-    if (notifPermission === "granted") {
+    if (getNotificationPermission() === "granted") {
       registerPushSubscription().catch(err =>
         console.warn("[Push] PM registration failed:", err.message)
       );
     }
-  }, [notifPermission]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Socket handlers ────────────────────────────────────────────────────────
   useSocket({
@@ -208,14 +218,14 @@ export default function PMDashboard() {
     { id:"open-requests",   label:"Open Requests",   count: openRequests.length   },
     { id:"closed-requests", label:"Closed Requests", count: closedRequests.length },
     { id:"daily-tasks",     label:"Daily Tasks",     count: activeTasks.length    },
-    { id:"saved-messages",  label:"Saved Messages"                                }, // ← NEW
+    { id:"saved-messages",  label:"Saved Messages"                                },
   ];
 
   const SECTION_TITLE = {
     tasks:"Tasks", users:"Users", "manage-users":"Manage Users",
     "open-requests":"Open Requests", "closed-requests":"Closed Requests",
     "daily-tasks":"Daily Tasks",
-    "saved-messages":"Saved Messages",                                              // ← NEW
+    "saved-messages":"Saved Messages",
   };
 
   const pad = isMobile ? "16px 14px" : "22px 28px";
@@ -271,7 +281,13 @@ export default function PMDashboard() {
               <button
                 onClick={async () => {
                   const ok = await requestNotificationPermission();
-                  setNotifPermission(ok ? "granted" : "denied");
+                  const newPerm = ok ? "granted" : "denied";
+                  setNotifPermission(newPerm);
+                  if (ok) {
+                    registerPushSubscription().catch(err =>
+                      console.warn("[Push] Registration after grant failed:", err.message)
+                    );
+                  }
                 }}
                 style={{
                   padding:"6px 16px", borderRadius:4,
@@ -430,7 +446,7 @@ export default function PMDashboard() {
           </div>
         )}
 
-        {/* ── SAVED MESSAGES ── (NEW) */}
+        {/* ── SAVED MESSAGES ── */}
         {activeSection==="saved-messages" && (
           <SavedMessagesSection isMobile={isMobile} />
         )}
