@@ -8,6 +8,12 @@
 //    again. The old [notifPermission] dep meant a user whose permission was
 //    already "granted" from a previous session would never re-subscribe after
 //    a server restart, silently dropping all push notifications.
+//
+//  NOTE: triggerAlert() behaviour has changed in notifications.js.
+//  It now plays sound only — no longer calls showNativeNotification().
+//  The service worker exclusively handles OS push notifications via Web Push,
+//  and the focused-client check in sw.js prevents duplicate OS notifications
+//  when the PM tab is in focus. Sound feedback remains when the tab is open.
 import { useEffect, useState, useCallback, useMemo } from "react";
 import useAuthStore  from "../stores/useAuthStore.js";
 import useNotifStore from "../stores/useNotificationStore.js";

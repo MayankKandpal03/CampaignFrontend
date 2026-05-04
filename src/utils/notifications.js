@@ -1,11 +1,33 @@
 // src/utils/notifications.js
 // Unified for ITDashboard + PMDashboard
 //
-// HOW NOTIFICATIONS WORK:
-//  - Tab OPEN & FOCUSED : socket fires → triggerAlert → showNativeNotification
-//                         sw.js sees client is focused → suppresses SW push (no duplicate)
-//  - Tab OPEN, NOT FOCUSED : SW push fires → sw.js shows OS notification
-//  - Tab CLOSED           : SW push fires → sw.js shows OS notification
+// HOW NOTIFICATIONS WORK (three states):
+//
+//  1. Tab OPEN + FOCUSED:
+//     Socket fires → triggerAlert() → plays sound only (no OS notification).
+//     For IT: the overlay card provides the visual in-app feedback.
+//     For PM: the notification bell + sound provides in-app feedback.
+//     sw.js detects a focused client → suppresses the SW push notification.
+//     Result: sound only — no duplicate OS popup while the user is in the app.
+//
+//  2. Tab OPEN, NOT FOCUSED (e.g. user on another browser tab):
+//     Socket fires → triggerAlert() → plays sound only.
+//     sw.js detects NO focused client → shows OS notification.
+//     Result: sound + 1 OS notification.
+//
+//  3. Tab CLOSED:
+//     Socket is disconnected → triggerAlert() never called.
+//     SW push fires → sw.js shows OS notification.
+//     Result: 1 OS notification.
+//
+// FIX — removed showNativeNotification() from triggerAlert():
+//   Previously triggerAlert called showNativeNotification() directly, which
+//   produced an OS notification from the frontend. The service-worker push
+//   ALSO produces an OS notification for the same event. This caused duplicates
+//   in every scenario where the socket was connected (tab open).
+//   Now triggerAlert only plays the sound; the SW exclusively owns OS
+//   notifications. The focused-client check in sw.js ensures the SW suppresses
+//   its notification when the user is actively looking at the app.
 
 import api from "../api/axios.js";
 
@@ -122,7 +144,10 @@ export const playNotificationSound = () => {
   }
 };
 
-// ── Native OS notification (exported for direct use if needed) ────────────────
+// ── Native OS notification ────────────────────────────────────────────────────
+// Kept as a standalone export for any code that explicitly needs a one-off
+// OS notification, but it is NO LONGER called inside triggerAlert().
+// The service worker exclusively manages OS notifications via Web Push.
 
 export const showNativeNotification = (title, body, onClickCb) => {
   if (!hasNotificationPermission()) return false;
@@ -150,16 +175,27 @@ export const showNativeNotification = (title, body, onClickCb) => {
 //
 // Called by socket event handlers when the tab IS open.
 //
-// DUPLICATE PREVENTION STRATEGY:
-//   sw.js checks if any client tab is focused before showing a push notification.
-//   If focused → sw.js suppresses the push notification.
-//   So calling showNativeNotification here is safe — sw.js won't double-fire.
+// WHAT IT DOES NOW:
+//   Plays the notification sound only. That's it.
 //
-//   Tab OPEN   → this function fires → plays sound + shows native OS notification
-//   Tab CLOSED → sw.js push fires   → shows OS notification (this never called)
+// WHAT IT NO LONGER DOES:
+//   It no longer calls showNativeNotification(). Previously this caused a
+//   duplicate OS notification alongside the one produced by the SW push event.
+//
+// WHO HANDLES OS NOTIFICATIONS NOW:
+//   Exclusively sw.js via Web Push. The focused-client check in sw.js
+//   suppresses the OS notification when the user is actively in the app
+//   (ensuring they're never double-notified), and shows it when they're away.
+//
+// WHO HANDLES VISUAL IN-APP FEEDBACK:
+//   IT Dashboard  → pushOverlay() renders the full-screen overlay card.
+//   PM Dashboard  → addNotification() updates the bell badge.
 
 export const triggerAlert = (title, body, onClickCb) => {
   playNotificationSound();
-  showNativeNotification(title, body, onClickCb);
+  // OS notification is handled solely by the service worker push event.
+  // Calling showNativeNotification here while the SW push is also firing
+  // produces duplicate OS popups. The sw.js focused-client check ensures
+  // the SW notification only fires when the user is away from the app.
   return true;
 };

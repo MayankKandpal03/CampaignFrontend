@@ -10,29 +10,26 @@
  *    empty or not.
  *
  * 2. FIX (Issue 1) — Real-time updates for all IT users:
- *    All socket events (campaign:it_queued, campaign:it_ack, campaign:updated,
- *    campaign:deleted, campaign:schedule_fired, dailytask:queued,
- *    dailytask:acked) correctly update local state so every connected IT user
- *    sees changes immediately without a manual refresh.  No logic changes were
- *    needed here — the existing socket plumbing was already correct.
+ *    All socket events correctly update local state so every connected IT user
+ *    sees changes immediately without a manual refresh.
  *
  * 3. FIX (Issue 3) — Duplicate OS notifications:
- *    triggerAlert in itNotifications.js no longer calls showNativeNotification.
+ *    triggerAlert in notifications.js no longer calls showNativeNotification.
  *    The service-worker push handles OS alerts; the overlay card handles
- *    in-tab visual feedback.  No changes required in this file for that fix.
+ *    in-tab visual feedback. No changes required in this file for that fix.
  *
- * 4. FIX (IT notifications) — triggerAlert now called directly in
- *    campaign:it_queued and dailytask:queued socket handlers, matching the
- *    same pattern used by PMDashboard. Previously only pushOverlay was called,
- *    which could silently fail without triggering any OS/sound notification.
+ * 4. FIX (IT push registration after permission grant) — KEY BUG FIX:
+ *    handleRequestPermission previously called requestNotificationPermission()
+ *    and updated state, but NEVER called registerPushSubscription() afterwards.
+ *    Without a subscription on the server, sendPushToRole("it", ...) in
+ *    socket.js has no endpoint to deliver to, so IT users never received push
+ *    notifications even after clicking "Enable Notifications".
+ *    PMDashboard already called registerPushSubscription() in its permission
+ *    handler — this fix brings ITDashboard to parity.
  *
- * 5. FIX (Push re-registration) — Push useEffect now uses [] as dependency so
- *    it fires on every mount, not only when permission changes. This ensures
- *    the subscription is re-registered after server restarts (which clear the
- *    in-memory subscriptions Map) without requiring the user to grant permission
- *    again. The old [notifPermission] dep meant a user whose permission was
- *    already "granted" from a previous session would never re-subscribe after
- *    a server restart, silently dropping all IT push notifications.
+ * 5. FIX (Push re-registration on mount) — Push useEffect uses [] so it fires
+ *    on every mount, re-registering after server restarts that clear the
+ *    in-memory subscriptions Map.
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
@@ -324,17 +321,34 @@ export default function ITDashboard() {
   // ── Notification permission ────────────────────────────────────────────────
   const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
 
-  // FIX: Use [] so push re-registers on every mount, not only when permission
-  // state changes. The server's in-memory subscriptions Map is cleared on every
-  // restart; without this fix, IT users already holding "granted" permission
-  // would never re-subscribe after a deploy — identical to the PM dashboard fix.
+  // FIX (Push re-registration): Use [] so push re-registers on every mount,
+  // not only when permission state changes. The server's in-memory
+  // subscriptions Map is cleared on every restart; this ensures IT users
+  // always have a live subscription after a deploy without needing to toggle
+  // permissions again.
   useEffect(() => {
     if (getNotificationPermission() === "granted") {
       registerPushSubscription().catch(err =>
-        console.warn("[Push] Registration failed:", err.message)
+        console.warn("[Push] IT registration failed:", err.message)
       );
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // FIX (KEY BUG): handleRequestPermission now calls registerPushSubscription()
+  // after the user grants permission. Previously it only updated the permission
+  // state but never sent a subscription to the server, so sendPushToRole("it")
+  // had no endpoint to deliver to — IT users received no push notifications.
+  // PMDashboard's equivalent handler already did this correctly; this fix
+  // brings ITDashboard to parity.
+  const handleRequestPermission = useCallback(async () => {
+    const granted = await requestNotificationPermission();
+    setNotifPermission(granted ? "granted" : "denied");
+    if (granted) {
+      registerPushSubscription().catch(err =>
+        console.warn("[Push] IT registration after grant failed:", err.message)
+      );
+    }
+  }, []);
 
   const notifBellRef = useRef(null);
   useEffect(() => {
@@ -365,11 +379,6 @@ export default function ITDashboard() {
   }, []);
 
   const currentOverlay = overlayQueue[0] ?? null;
-
-  const handleRequestPermission = useCallback(async () => {
-    const granted = await requestNotificationPermission();
-    setNotifPermission(granted ? "granted" : "denied");
-  }, []);
 
   const pushOverlay = useCallback((notif) => {
     const entry = { ...notif, id: Date.now() + Math.random() };
@@ -451,7 +460,6 @@ export default function ITDashboard() {
       const msgPreview = (c.pmMessage || c.message || "New task assigned").slice(0, 120);
       addNotification(`📋 New campaign in queue: "${msgPreview}${msgPreview.length >= 120 ? "…" : ""}"`);
 
-      // FIX: call triggerAlert directly (sound + OS notification) — same as PMDashboard
       triggerAlert(
         "New Task Assigned",
         c.pmMessage || c.message?.slice(0, 200) || "A new campaign requires your acknowledgement.",
@@ -505,7 +513,6 @@ export default function ITDashboard() {
       const taskPreview = (task.task || "Daily task needs acknowledgement").slice(0, 100);
       addNotification(`🗓 Daily task due: "${taskPreview}${taskPreview.length >= 100 ? "…" : ""}"`);
 
-      // FIX: call triggerAlert directly (sound + OS notification) — same as PMDashboard
       triggerAlert(
         "Daily Task Due Now",
         task.task?.slice(0, 200) || "A scheduled daily task requires your acknowledgement.",
