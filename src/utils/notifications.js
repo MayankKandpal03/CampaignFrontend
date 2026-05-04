@@ -165,5 +165,8 @@ export const showNativeNotification = (title, body, onClickCb) => {
  */
 export const triggerAlert = (title, body, onClickCb) => {
   playNotificationSound();
+  // Only show native notification if tab is NOT visible
+  // (SW push handles it when tab is hidden)
+  if (document.visibilityState === 'visible') return;
   showNativeNotification(title, body, onClickCb);
 };
