@@ -1,36 +1,4 @@
 // src/pages/ITDashboard.jsx
-/**
- * CHANGES FROM PREVIOUS VERSION:
- * 1. FIX (Issue 2) — History not always updating:
- *    The previous guard `if (prev.length === 0) return prev` could not
- *    distinguish "history not yet fetched" from "fetched but genuinely empty".
- *    Replaced with a `historyLoadedRef` that is set to true once fetchHistory
- *    completes. The `campaign:it_ack` socket handler now checks this ref, so
- *    new acknowledgements always appear in the history list whether it was
- *    empty or not.
- *
- * 2. FIX (Issue 1) — Real-time updates for all IT users:
- *    All socket events correctly update local state so every connected IT user
- *    sees changes immediately without a manual refresh.
- *
- * 3. FIX (Issue 3) — Duplicate OS notifications:
- *    triggerAlert in notifications.js no longer calls showNativeNotification.
- *    The service-worker push handles OS alerts; the overlay card handles
- *    in-tab visual feedback. No changes required in this file for that fix.
- *
- * 4. FIX (IT push registration after permission grant) — KEY BUG FIX:
- *    handleRequestPermission previously called requestNotificationPermission()
- *    and updated state, but NEVER called registerPushSubscription() afterwards.
- *    Without a subscription on the server, sendPushToRole("it", ...) in
- *    socket.js has no endpoint to deliver to, so IT users never received push
- *    notifications even after clicking "Enable Notifications".
- *    PMDashboard already called registerPushSubscription() in its permission
- *    handler — this fix brings ITDashboard to parity.
- *
- * 5. FIX (Push re-registration on mount) — Push useEffect uses [] so it fires
- *    on every mount, re-registering after server restarts that clear the
- *    in-memory subscriptions Map.
- */
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 
 import useCampaignStore from "../stores/useCampaignStore.js";
@@ -38,16 +6,14 @@ import useAuthStore     from "../stores/useAuthStore.js";
 import useNotifStore    from "../stores/useNotificationStore.js";
 import { useSocket }    from "../hooks/useSocket.js";
 import { useLogout }    from "../hooks/useLogout.js";
+import { useNotifications } from "../hooks/useNotifications.js";
 import api              from "../api/axios.js";
 
 import { fmt, initials } from "../utils/formatters.js";
 import AckModal          from "../components/campaigns/AckModal.jsx";
 import ITNotifPanel      from "../components/common/ITNotifPanel.jsx";
 import {
-  requestNotificationPermission,
-  getNotificationPermission,
   triggerAlert,
-  registerPushSubscription,
   unregisterPushSubscription,
 } from "../utils/notifications.js";
 
@@ -73,32 +39,33 @@ function NotifPermissionBanner({ permission, onRequest }) {
   const isDenied = permission === "denied";
   return (
     <div style={{
-      display:"flex", alignItems:"center", justifyContent:"space-between",
-      gap:12, padding:"10px 28px",
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      gap: 12, padding: "10px 28px",
       background:   isDenied ? "var(--danger-lt)" : "var(--warn-lt)",
       borderBottom: `1px solid ${isDenied ? "rgba(184,48,48,0.2)" : "rgba(143,66,12,0.2)"}`,
-      flexWrap:"wrap",
+      flexWrap: "wrap",
     }}>
-      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-        <span style={{ fontSize:16 }}>{isDenied ? "🔕" : "🔔"}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <span style={{ fontSize: 16 }}>{isDenied ? "🔕" : "🔔"}</span>
         <div>
-          <p style={{ margin:0, fontSize:12, fontWeight:500, color: isDenied ? "var(--danger)" : "var(--warn)", fontFamily:"var(--ff-body)" }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: isDenied ? "var(--danger)" : "var(--warn)", fontFamily: "var(--ff-body)" }}>
             {isDenied
               ? "Desktop notifications are blocked — you won't be alerted on other tabs."
               : "Enable desktop notifications to receive alerts when you're on other tabs or apps."}
           </p>
           {isDenied && (
-            <p style={{ margin:"2px 0 0", fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
+            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>
               To re-enable: click the 🔒 lock icon in your browser address bar → Notifications → Allow
             </p>
           )}
         </div>
       </div>
       {!isDenied && (
-        <button onClick={onRequest}
-          style={{ padding:"7px 16px", borderRadius:"var(--radius-sm)", border:"1.5px solid var(--warn)", background:"var(--warn-lt)", color:"var(--warn)", fontFamily:"var(--ff-body)", fontSize:12, fontWeight:600, cursor:"pointer", whiteSpace:"nowrap", transition:"all 0.15s ease", flexShrink:0 }}
-          onMouseEnter={e => { e.currentTarget.style.background="var(--warn)"; e.currentTarget.style.color="#fff"; }}
-          onMouseLeave={e => { e.currentTarget.style.background="var(--warn-lt)"; e.currentTarget.style.color="var(--warn)"; }}>
+        <button
+          onClick={onRequest}
+          style={{ padding: "7px 16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--warn)", background: "var(--warn-lt)", color: "var(--warn)", fontFamily: "var(--ff-body)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s ease", flexShrink: 0 }}
+          onMouseEnter={e => { e.currentTarget.style.background = "var(--warn)"; e.currentTarget.style.color = "#fff"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "var(--warn-lt)"; e.currentTarget.style.color = "var(--warn)"; }}>
           Enable Notifications
         </button>
       )}
@@ -124,13 +91,18 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
         <div className="modal-body">
           <div className="field-group">
             <label className="field-label">Scheduled Time</label>
-            <p style={{ margin:0, fontFamily:"var(--ff-mono)", fontSize:13, color:"var(--accent)" }}>{task.time}</p>
+            <p style={{ margin: 0, fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--accent)" }}>{task.time}</p>
           </div>
           <div className="field-group">
             <label className="field-label">Your Message (optional)</label>
-            <textarea value={message} onChange={e => setMessage(e.target.value)} placeholder="Add any notes about this task completion…" rows={3}/>
+            <textarea
+              value={message}
+              onChange={e => setMessage(e.target.value)}
+              placeholder="Add any notes about this task completion…"
+              rows={3}
+            />
           </div>
-          <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
+          <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>
             ℹ "Done at [time]" will be appended automatically.
           </p>
         </div>
@@ -151,60 +123,62 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
   const accentColor = isCampaign ? "var(--accent)" : "var(--info)";
   const accentBg    = isCampaign ? "var(--accent-lt)" : "var(--info-lt)";
   return (
-    <div style={{ position:"fixed", inset:0, zIndex:99999, background:"rgba(18,17,12,0.85)", backdropFilter:"blur(8px)", WebkitBackdropFilter:"blur(8px)", display:"flex", alignItems:"center", justifyContent:"center", padding:24, animation:"itOverlayIn 0.3s cubic-bezier(.22,1,.36,1) both" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(18,17,12,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, animation: "itOverlayIn 0.3s cubic-bezier(.22,1,.36,1) both" }}>
       <style>{`
         @keyframes itOverlayIn { from{opacity:0}to{opacity:1} }
         @keyframes itCardIn    { from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none} }
         @keyframes itPulseRing { 0%{transform:scale(1);opacity:.9}70%{transform:scale(1.7);opacity:0}100%{transform:scale(1.7);opacity:0} }
         @keyframes itBounceIn  { 0%{transform:scale(.3)}50%{transform:scale(1.07)}70%{transform:scale(.96)}100%{transform:scale(1)} }
       `}</style>
-      <div style={{ width:"100%", maxWidth:500, background:"var(--surface)", border:`1px solid ${isCampaign?"rgba(42,96,72,0.4)":"rgba(26,79,110,0.4)"}`, borderRadius:20, overflow:"hidden", boxShadow:"0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05)", animation:"itCardIn .35s cubic-bezier(.22,1,.36,1) both" }}>
-        <div style={{ height:4, background: isCampaign?"linear-gradient(90deg,var(--accent),#3a7a5a)":"linear-gradient(90deg,var(--info),#2a6a8e)" }}/>
-        <div style={{ padding:"24px 28px 18px", background:"var(--surface2)", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"flex-start", gap:16 }}>
-          <div style={{ position:"relative", flexShrink:0 }}>
-            <div style={{ position:"absolute", inset:0, borderRadius:"50%", background:accentBg, animation:"itPulseRing 1.6s ease-out infinite" }}/>
-            <div style={{ width:46, height:46, borderRadius:"50%", background:accentBg, border:`2px solid ${accentColor}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, position:"relative", animation:"itBounceIn .5s cubic-bezier(.22,1,.36,1) .1s both" }}>
+      <div style={{ width: "100%", maxWidth: 500, background: "var(--surface)", border: `1px solid ${isCampaign ? "rgba(42,96,72,0.4)" : "rgba(26,79,110,0.4)"}`, borderRadius: 20, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05)", animation: "itCardIn .35s cubic-bezier(.22,1,.36,1) both" }}>
+        <div style={{ height: 4, background: isCampaign ? "linear-gradient(90deg,var(--accent),#3a7a5a)" : "linear-gradient(90deg,var(--info),#2a6a8e)" }} />
+        <div style={{ padding: "24px 28px 18px", background: "var(--surface2)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 16 }}>
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: accentBg, animation: "itPulseRing 1.6s ease-out infinite" }} />
+            <div style={{ width: 46, height: 46, borderRadius: "50%", background: accentBg, border: `2px solid ${accentColor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, position: "relative", animation: "itBounceIn .5s cubic-bezier(.22,1,.36,1) .1s both" }}>
               {isCampaign ? "📋" : "🗓"}
             </div>
           </div>
-          <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ margin:"0 0 4px", fontSize:10, fontFamily:"var(--ff-mono)", letterSpacing:"0.1em", textTransform:"uppercase", color:accentColor, fontWeight:600 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: "0 0 4px", fontSize: 10, fontFamily: "var(--ff-mono)", letterSpacing: "0.1em", textTransform: "uppercase", color: accentColor, fontWeight: 600 }}>
               {isCampaign ? "🔴 New Task Assigned" : "⏰ Daily Task Due Now"}
             </p>
-            <h2 style={{ margin:"0 0 3px", fontSize:19, fontWeight:700, color:"var(--text)", fontFamily:"var(--ff-display)", letterSpacing:"-0.02em", lineHeight:1.2 }}>{notif.title}</h2>
-            <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>
-              Received {new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit",hour12:true})}
-              {queueLength > 1 && <span style={{ marginLeft:8, padding:"1px 8px", borderRadius:99, background:"var(--danger-lt)", color:"var(--danger)", border:"1px solid rgba(184,48,48,.2)", fontSize:10 }}>+{queueLength-1} more waiting</span>}
+            <h2 style={{ margin: "0 0 3px", fontSize: 19, fontWeight: 700, color: "var(--text)", fontFamily: "var(--ff-display)", letterSpacing: "-0.02em", lineHeight: 1.2 }}>{notif.title}</h2>
+            <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>
+              Received {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+              {queueLength > 1 && <span style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 99, background: "var(--danger-lt)", color: "var(--danger)", border: "1px solid rgba(184,48,48,.2)", fontSize: 10 }}>+{queueLength - 1} more waiting</span>}
             </p>
           </div>
         </div>
-        <div style={{ padding:"20px 28px" }}>
-          <div style={{ padding:"13px 16px", background:"var(--surface3)", border:"1px solid var(--border)", borderRadius:10, marginBottom:14 }}>
-            <p style={{ margin:"0 0 6px", fontSize:8, fontFamily:"var(--ff-mono)", letterSpacing:"0.1em", textTransform:"uppercase", color:"var(--muted)" }}>{isCampaign?"PM Note / Message":"Task Description"}</p>
-            <p style={{ margin:0, fontSize:14, color:"var(--ink)", lineHeight:1.65, wordBreak:"break-word", fontFamily:"var(--ff-body)" }}>{notif.body||"—"}</p>
+        <div style={{ padding: "20px 28px" }}>
+          <div style={{ padding: "13px 16px", background: "var(--surface3)", border: "1px solid var(--border)", borderRadius: 10, marginBottom: 14 }}>
+            <p style={{ margin: "0 0 6px", fontSize: 8, fontFamily: "var(--ff-mono)", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>{isCampaign ? "PM Note / Message" : "Task Description"}</p>
+            <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", lineHeight: 1.65, wordBreak: "break-word", fontFamily: "var(--ff-body)" }}>{notif.body || "—"}</p>
           </div>
-          <div style={{ display:"flex", alignItems:"flex-start", gap:9, padding:"10px 14px", background:"rgba(143,66,12,.07)", border:"1px solid rgba(143,66,12,.18)", borderRadius:8, marginBottom:20 }}>
-            <span style={{ fontSize:14, flexShrink:0, marginTop:1 }}>⚠️</span>
-            <p style={{ margin:0, fontSize:12, color:"var(--warn)", lineHeight:1.55, fontFamily:"var(--ff-body)" }}>This notification requires your attention. Acknowledge to confirm, or dismiss to handle it later.</p>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "10px 14px", background: "rgba(143,66,12,.07)", border: "1px solid rgba(143,66,12,.18)", borderRadius: 8, marginBottom: 20 }}>
+            <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+            <p style={{ margin: 0, fontSize: 12, color: "var(--warn)", lineHeight: 1.55, fontFamily: "var(--ff-body)" }}>This notification requires your attention. Acknowledge to confirm, or dismiss to handle it later.</p>
           </div>
-          <div style={{ display:"flex", gap:10 }}>
-            <button onClick={onClose}
-              style={{ flex:1, padding:"12px", borderRadius:10, border:"1.5px solid var(--border2)", background:"none", fontFamily:"var(--ff-body)", fontSize:13, fontWeight:500, color:"var(--muted)", cursor:"pointer", transition:"all .15s ease" }}
-              onMouseEnter={e=>{e.currentTarget.style.color="var(--ink)";e.currentTarget.style.background="var(--surface2)";}}
-              onMouseLeave={e=>{e.currentTarget.style.color="var(--muted)";e.currentTarget.style.background="none";}}>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button
+              onClick={onClose}
+              style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1.5px solid var(--border2)", background: "none", fontFamily: "var(--ff-body)", fontSize: 13, fontWeight: 500, color: "var(--muted)", cursor: "pointer", transition: "all .15s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.color = "var(--ink)"; e.currentTarget.style.background = "var(--surface2)"; }}
+              onMouseLeave={e => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "none"; }}>
               Dismiss (handle later)
             </button>
-            <button onClick={() => onAck(notif)}
-              style={{ flex:2, padding:"12px", borderRadius:10, border:"1.5px solid transparent", background:isCampaign?"linear-gradient(135deg,var(--accent),#3a7a5a)":"linear-gradient(135deg,var(--info),#2a6a8e)", fontFamily:"var(--ff-body)", fontSize:14, fontWeight:600, color:"#fff", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all .15s ease", boxShadow:"0 4px 16px rgba(0,0,0,.15)" }}
-              onMouseEnter={e=>{e.currentTarget.style.opacity=".9";e.currentTarget.style.transform="translateY(-1px)";}}
-              onMouseLeave={e=>{e.currentTarget.style.opacity="1";e.currentTarget.style.transform="none";}}>
-              <span style={{ fontSize:16 }}>✓</span> Acknowledge Now
+            <button
+              onClick={() => onAck(notif)}
+              style={{ flex: 2, padding: "12px", borderRadius: 10, border: "1.5px solid transparent", background: isCampaign ? "linear-gradient(135deg,var(--accent),#3a7a5a)" : "linear-gradient(135deg,var(--info),#2a6a8e)", fontFamily: "var(--ff-body)", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .15s ease", boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = ".9"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "none"; }}>
+              <span style={{ fontSize: 16 }}>✓</span> Acknowledge Now
             </button>
           </div>
         </div>
-        <div style={{ padding:"10px 28px", background:"var(--surface2)", borderTop:"1px solid var(--border)", display:"flex", alignItems:"center", gap:6 }}>
-          <span style={{ width:6, height:6, borderRadius:"50%", background:accentColor, animation:"itPulseRing 1.6s ease-out infinite", flexShrink:0 }}/>
-          <p style={{ margin:0, fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>IT Portal · Campaign Management System</p>
+        <div style={{ padding: "10px 28px", background: "var(--surface2)", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColor, animation: "itPulseRing 1.6s ease-out infinite", flexShrink: 0 }} />
+          <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>IT Portal · Campaign Management System</p>
         </div>
       </div>
     </div>
@@ -216,7 +190,7 @@ function HistoryTable({ records, loading }) {
   if (loading) {
     return (
       <div className="table-empty">
-        <div className="table-empty-icon" style={{ fontSize:28 }}>⏳</div>
+        <div className="table-empty-icon" style={{ fontSize: 28 }}>⏳</div>
         <div className="table-empty-text">Loading history…</div>
       </div>
     );
@@ -231,11 +205,11 @@ function HistoryTable({ records, loading }) {
   }
   return (
     <table>
-      <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--surface2)" }}>
+      <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface2)" }}>
         <tr>
-          <th style={{ width:"38%" }}>PM Note</th>
-          <th style={{ width:"18%", whiteSpace:"nowrap" }}>Schedule Time</th>
-          <th style={{ width:"44%" }}>IT Note</th>
+          <th style={{ width: "38%" }}>PM Note</th>
+          <th style={{ width: "18%", whiteSpace: "nowrap" }}>Schedule Time</th>
+          <th style={{ width: "44%" }}>IT Note</th>
         </tr>
       </thead>
       <tbody>
@@ -244,18 +218,18 @@ function HistoryTable({ records, loading }) {
           const noteColor = isDone ? "var(--accent)" : "var(--warn)";
           return (
             <tr key={c._id}>
-              <td style={{ padding:"16px 18px", maxWidth:0, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.65, verticalAlign:"top" }}>
+              <td style={{ padding: "16px 18px", maxWidth: 0, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.65, verticalAlign: "top" }}>
                 {c.pmMessage
-                  ? <span style={{ fontSize:13, color:"var(--ink)", fontFamily:"var(--ff-body)" }}>{c.pmMessage}</span>
-                  : <span style={{ fontSize:12, color:"var(--muted)", fontStyle:"italic" }}>No PM note</span>}
+                  ? <span style={{ fontSize: 13, color: "var(--ink)", fontFamily: "var(--ff-body)" }}>{c.pmMessage}</span>
+                  : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>No PM note</span>}
               </td>
-              <td className="time-cell" style={{ padding:"16px 18px", verticalAlign:"top", whiteSpace:"nowrap" }}>
+              <td className="time-cell" style={{ padding: "16px 18px", verticalAlign: "top", whiteSpace: "nowrap" }}>
                 {c.scheduleAt ? fmt(c.scheduleAt) : "—"}
               </td>
-              <td style={{ padding:"16px 18px", maxWidth:0, verticalAlign:"top", borderLeft:`3px solid ${noteColor}`, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.65 }}>
+              <td style={{ padding: "16px 18px", maxWidth: 0, verticalAlign: "top", borderLeft: `3px solid ${noteColor}`, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.65 }}>
                 {c.itMessage
-                  ? <span style={{ fontSize:13, color:"var(--ink)", fontFamily:"var(--ff-body)" }}>{c.itMessage}</span>
-                  : <span style={{ fontSize:12, color:"var(--muted)", fontStyle:"italic" }}>No IT note</span>}
+                  ? <span style={{ fontSize: 13, color: "var(--ink)", fontFamily: "var(--ff-body)" }}>{c.itMessage}</span>
+                  : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>No IT note</span>}
               </td>
             </tr>
           );
@@ -274,6 +248,9 @@ export default function ITDashboard() {
   const addNotification = useNotifStore(s => s.addNotification);
   const unread          = useNotifStore(s => s.unread);
   const markRead        = useNotifStore(s => s.markRead);
+
+  // ── Notifications (permission + push registration) ────────────────────────
+  const { notifPermission, handleRequestPermission } = useNotifications();
 
   const _handleLogout = useLogout();
   const handleLogout = useCallback(async () => {
@@ -301,7 +278,8 @@ export default function ITDashboard() {
 
   // ── History fetch ─────────────────────────────────────────────────────────
   const fetchHistory = useCallback(async (showSpinner = true) => {
-    if (showSpinner) setHistoryLoading(true); else setHistoryRefreshing(true);
+    if (showSpinner) setHistoryLoading(true);
+    else setHistoryRefreshing(true);
     try {
       const res = await api.get("/campaign/history");
       setHistory(res.data?.data ?? []);
@@ -318,38 +296,7 @@ export default function ITDashboard() {
     if (activeSection === "history") fetchHistory();
   }, [activeSection, fetchHistory]);
 
-  // ── Notification permission ────────────────────────────────────────────────
-  const [notifPermission, setNotifPermission] = useState(() => getNotificationPermission());
-
-  // FIX (Push re-registration): Use [] so push re-registers on every mount,
-  // not only when permission state changes. The server's in-memory
-  // subscriptions Map is cleared on every restart; this ensures IT users
-  // always have a live subscription after a deploy without needing to toggle
-  // permissions again.
-  useEffect(() => {
-    if (getNotificationPermission() === "granted") {
-      registerPushSubscription().catch(err =>
-        console.warn("[Push] IT registration failed:", err.message)
-      );
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // FIX (KEY BUG): handleRequestPermission now calls registerPushSubscription()
-  // after the user grants permission. Previously it only updated the permission
-  // state but never sent a subscription to the server, so sendPushToRole("it")
-  // had no endpoint to deliver to — IT users received no push notifications.
-  // PMDashboard's equivalent handler already did this correctly; this fix
-  // brings ITDashboard to parity.
-  const handleRequestPermission = useCallback(async () => {
-    const granted = await requestNotificationPermission();
-    setNotifPermission(granted ? "granted" : "denied");
-    if (granted) {
-      registerPushSubscription().catch(err =>
-        console.warn("[Push] IT registration after grant failed:", err.message)
-      );
-    }
-  }, []);
-
+  // ── Notification bell click-outside ───────────────────────────────────────
   const notifBellRef = useRef(null);
   useEffect(() => {
     if (!showNotifs) return;
@@ -361,7 +308,7 @@ export default function ITDashboard() {
     return () => document.removeEventListener("mousedown", handler);
   }, [showNotifs]);
 
-  // ── BroadcastChannel ──────────────────────────────────────────────────────
+  // ── BroadcastChannel (multi-tab overlay sync) ─────────────────────────────
   const bcRef = useRef(null);
   useEffect(() => {
     if (!("BroadcastChannel" in window)) return;
@@ -386,14 +333,14 @@ export default function ITDashboard() {
     bcRef.current?.postMessage({ type: "overlay_push", notif: entry });
   }, []);
 
-  const dismissOverlay  = useCallback(() => setOverlayQueue(prev => prev.slice(1)), []);
-  const ackFromOverlay  = useCallback((notif) => {
+  const dismissOverlay = useCallback(() => setOverlayQueue(prev => prev.slice(1)), []);
+  const ackFromOverlay = useCallback((notif) => {
     dismissOverlay();
     if (notif.type === "campaign") setAckTarget(notif.item);
     else if (notif.type === "task") setTaskAckTarget(notif.item);
   }, [dismissOverlay]);
 
-  // ── Reactive now ──────────────────────────────────────────────────────────
+  // ── Reactive now (schedule display) ──────────────────────────────────────
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const currentReal = Date.now();
@@ -431,15 +378,12 @@ export default function ITDashboard() {
     fetchDueTasks();
   }, [getCampaign, fetchDueTasks]);
 
+  // Poll every 60s as a fallback
   useEffect(() => {
-    const id = setInterval(() => getCampaign().catch(console.error), 60_000);
-    return () => clearInterval(id);
-  }, [getCampaign]);
-
-  useEffect(() => {
-    const id = setInterval(() => fetchDueTasks(), 60_000);
-    return () => clearInterval(id);
-  }, [fetchDueTasks]);
+    const c = setInterval(() => getCampaign().catch(console.error), 60_000);
+    const t = setInterval(() => fetchDueTasks(), 60_000);
+    return () => { clearInterval(c); clearInterval(t); };
+  }, [getCampaign, fetchDueTasks]);
 
   useEffect(() => {
     if (activeSection === "schedule-tasks") fetchDueTasks();
@@ -447,7 +391,6 @@ export default function ITDashboard() {
 
   // ── Socket handlers ───────────────────────────────────────────────────────
   useSocket({
-    // ── Campaign queue ────────────────────────────────────────────────────
     "campaign:it_queued": c => {
       useCampaignStore.setState(s => {
         const exists = s.campaigns.some(x => x._id === c._id);
@@ -459,12 +402,10 @@ export default function ITDashboard() {
       });
       const msgPreview = (c.pmMessage || c.message || "New task assigned").slice(0, 120);
       addNotification(`📋 New campaign in queue: "${msgPreview}${msgPreview.length >= 120 ? "…" : ""}"`);
-
       triggerAlert(
-        "New Task Assigned",
+        "📋 New Task Assigned",
         c.pmMessage || c.message?.slice(0, 200) || "A new campaign requires your acknowledgement.",
       );
-
       pushOverlay({
         type:  "campaign",
         title: "New Task Assigned",
@@ -474,6 +415,12 @@ export default function ITDashboard() {
     },
 
     "campaign:updated": c => {
+      useCampaignStore.setState(s => ({
+        campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
+      }));
+    },
+
+    "campaign:schedule_fired": c => {
       useCampaignStore.setState(s => ({
         campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
       }));
@@ -498,13 +445,6 @@ export default function ITDashboard() {
       }));
     },
 
-    "campaign:schedule_fired": c => {
-      useCampaignStore.setState(s => ({
-        campaigns: s.campaigns.map(x => x._id === c._id ? c : x),
-      }));
-    },
-
-    // ── Daily tasks ────────────────────────────────────────────────────────
     "dailytask:queued": task => {
       setDailyTasks(prev => {
         const exists = prev.some(t => String(t._id) === String(task._id));
@@ -512,12 +452,10 @@ export default function ITDashboard() {
       });
       const taskPreview = (task.task || "Daily task needs acknowledgement").slice(0, 100);
       addNotification(`🗓 Daily task due: "${taskPreview}${taskPreview.length >= 100 ? "…" : ""}"`);
-
       triggerAlert(
-        "Daily Task Due Now",
+        "⏰ Daily Task Due Now",
         task.task?.slice(0, 200) || "A scheduled daily task requires your acknowledgement.",
       );
-
       pushOverlay({
         type:  "task",
         title: "Daily Task Due Now",
@@ -564,24 +502,26 @@ export default function ITDashboard() {
     setAckLoading(true);
     try {
       const doneAt = new Date().toLocaleString("en-IN", {
-        day:"2-digit", month:"2-digit", year:"numeric",
-        hour:"2-digit", minute:"2-digit", hour12:false,
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: false,
       });
       const finalMessage = itMessage
         ? `${itMessage}\n\nat ${doneAt} by ${user}`
         : `at ${doneAt} by ${user}`;
       await updateCampaign(ackTarget._id, { acknowledgement, itMessage: finalMessage });
       if (acknowledgement === "done") {
-        addNotification(`✅ Campaign "${ackTarget.message?.slice(0,30)}…" marked Done by ${user}`);
+        addNotification(`✅ Campaign "${ackTarget.message?.slice(0, 30)}…" marked Done by ${user}`);
         pushToast("Task acknowledged as Done. PMs & owner notified.");
       } else {
-        addNotification(`⚠ "${ackTarget.message?.slice(0,30)}…" marked Not Done — Reason: ${itMessage}`);
+        addNotification(`⚠ "${ackTarget.message?.slice(0, 30)}…" marked Not Done`);
         pushToast("Task marked Not Done.", "warn");
       }
       setAckTarget(null);
     } catch {
       pushToast("Failed to update. Please retry.", "warn");
-    } finally { setAckLoading(false); }
+    } finally {
+      setAckLoading(false);
+    }
   };
 
   // ── Daily task acknowledge ────────────────────────────────────────────────
@@ -595,41 +535,46 @@ export default function ITDashboard() {
       addNotification(`✅ Daily task acknowledged by ${user}`);
     } catch (err) {
       pushToast(err?.response?.data?.message || "Failed to acknowledge task.", "warn");
-    } finally { setTaskAckLoading(false); }
+    } finally {
+      setTaskAckLoading(false);
+    }
   };
 
   // ── Nav ───────────────────────────────────────────────────────────────────
   const NAV_ITEMS = [
-    { id:"tasks",          label:"Tasks",          icon:"📋", count: pendingCount      },
-    { id:"schedule-tasks", label:"Schedule Tasks", icon:"🗓", count: dailyTasks.length },
-    { id:"history",        label:"History",        icon:"🕓", count: history.length    },
+    { id: "tasks",          label: "Tasks",          icon: "📋", count: pendingCount      },
+    { id: "schedule-tasks", label: "Schedule Tasks", icon: "🗓", count: dailyTasks.length },
+    { id: "history",        label: "History",        icon: "🕓", count: history.length    },
   ];
 
   return (
-    <div className="it-root" style={{ height:"100vh", overflow:"hidden" }}>
-      <div className={`sidebar-overlay ${sidebarOpen?"show":""}`} onClick={() => setSidebarOpen(false)}/>
+    <div className="it-root" style={{ height: "100vh", overflow: "hidden" }}>
+      <div className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* ── Sidebar ── */}
-      <aside className={`it-sidebar ${sidebarOpen?"mobile-open":""}`}>
+      <aside className={`it-sidebar ${sidebarOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-name">Task<i style={{ fontStyle:"normal", opacity:.4 }}>.</i></div>
+          <div className="sidebar-brand-name">Task<i style={{ fontStyle: "normal", opacity: .4 }}>.</i></div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
         <div className="sidebar-user">
-          <div className="user-avatar">{initials(user||"IT")}</div>
+          <div className="user-avatar">{initials(user || "IT")}</div>
           <div>
-            <div className="user-info-name">{user||"IT User"}</div>
+            <div className="user-info-name">{user || "IT User"}</div>
             <div className="user-info-role">{role}</div>
           </div>
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(item => (
-            <button key={item.id} className={`nav-item ${activeSection===item.id?"active":""}`}
-              onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}>
+            <button
+              key={item.id}
+              className={`nav-item ${activeSection === item.id ? "active" : ""}`}
+              onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}
+            >
               <span className="nav-icon">{item.icon}</span>
-              <span style={{ flex:1 }}>{item.label}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
               {item.count > 0 && (
-                <span style={{ padding:"1px 7px", borderRadius:99, background: activeSection===item.id?"var(--accent)":"var(--surface3)", color: activeSection===item.id?"#fff":"var(--muted)", fontSize:10, fontFamily:"var(--ff-mono)", fontWeight:700 }}>
+                <span style={{ padding: "1px 7px", borderRadius: 99, background: activeSection === item.id ? "var(--accent)" : "var(--surface3)", color: activeSection === item.id ? "#fff" : "var(--muted)", fontSize: 10, fontFamily: "var(--ff-mono)", fontWeight: 700 }}>
                   {item.count}
                 </span>
               )}
@@ -642,60 +587,61 @@ export default function ITDashboard() {
       </aside>
 
       {/* ── Main ── */}
-      <div className="it-main" style={{ display:"flex", flexDirection:"column", overflow:"hidden" }}>
-        <NotifPermissionBanner permission={notifPermission} onRequest={handleRequestPermission}/>
+      <div className="it-main" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <NotifPermissionBanner permission={notifPermission} onRequest={handleRequestPermission} />
 
         {/* ── Header ── */}
         <header className="it-header">
           <button className="hamburger" onClick={() => setSidebarOpen(!sidebarOpen)}>
-            <span/><span/><span/>
+            <span /><span /><span />
           </button>
           <h1 className="header-title">
-            {activeSection==="tasks"          && "Scheduled Campaigns"}
-            {activeSection==="schedule-tasks" && "Schedule Tasks"}
-            {activeSection==="history"        && "Acknowledgement History"}
+            {activeSection === "tasks"          && "Scheduled Campaigns"}
+            {activeSection === "schedule-tasks" && "Schedule Tasks"}
+            {activeSection === "history"        && "Acknowledgement History"}
           </h1>
           <span className="header-badge">
-            {activeSection==="tasks"          && `${pendingCount} Pending`}
-            {activeSection==="schedule-tasks" && `${dailyTasks.length} Due`}
-            {activeSection==="history"        && `${history.length} Records`}
+            {activeSection === "tasks"          && `${pendingCount} Pending`}
+            {activeSection === "schedule-tasks" && `${dailyTasks.length} Due`}
+            {activeSection === "history"        && `${history.length} Records`}
           </span>
 
           {/* Notification Bell */}
-          <div style={{ position:"relative" }} ref={notifBellRef}>
+          <div style={{ position: "relative" }} ref={notifBellRef}>
             <button
               onClick={() => { setShowNotifs(v => !v); if (!showNotifs) markRead(); }}
               title={`${unread} unread notifications`}
-              style={{ width:46, height:36, borderRadius:"var(--radius-sm)", border: showNotifs?"1.5px solid var(--accent)":"1px solid var(--border)", background: showNotifs?"var(--accent-lt)":"var(--surface)", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", transition:"all .18s ease", position:"relative", flexShrink:0, boxShadow: showNotifs?"0 2px 8px rgba(42,96,72,.15)":"var(--shadow-sm)" }}
-              onMouseEnter={e => { if (!showNotifs) { e.currentTarget.style.borderColor="var(--border2)"; e.currentTarget.style.background="var(--surface2)"; } }}
-              onMouseLeave={e => { if (!showNotifs) { e.currentTarget.style.borderColor="var(--border)"; e.currentTarget.style.background="var(--surface)"; } }}
-              aria-label="Notifications">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={showNotifs?"var(--accent)":"var(--muted)"} strokeWidth="2">
-                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0"/>
+              style={{ width: 46, height: 36, borderRadius: "var(--radius-sm)", border: showNotifs ? "1.5px solid var(--accent)" : "1px solid var(--border)", background: showNotifs ? "var(--accent-lt)" : "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .18s ease", position: "relative", flexShrink: 0, boxShadow: showNotifs ? "0 2px 8px rgba(42,96,72,.15)" : "var(--shadow-sm)" }}
+              onMouseEnter={e => { if (!showNotifs) { e.currentTarget.style.borderColor = "var(--border2)"; e.currentTarget.style.background = "var(--surface2)"; } }}
+              onMouseLeave={e => { if (!showNotifs) { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; } }}
+              aria-label="Notifications"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={showNotifs ? "var(--accent)" : "var(--muted)"} strokeWidth="2">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
               </svg>
               {unread > 0 && (
-                <span style={{ position:"absolute", top:-4, right:-4, minWidth:16, height:16, borderRadius:99, background:"var(--danger)", color:"#fff", fontSize:9, fontFamily:"var(--ff-mono)", fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 3px", border:"2px solid var(--bg)" }}>
+                <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: "var(--danger)", color: "#fff", fontSize: 9, fontFamily: "var(--ff-mono)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", border: "2px solid var(--bg)" }}>
                   {unread > 99 ? "99+" : unread}
                 </span>
               )}
               {overlayQueue.length > 0 && unread === 0 && (
-                <span style={{ position:"absolute", top:-4, right:-4, width:10, height:10, borderRadius:"50%", background:"var(--warn)", border:"2px solid var(--bg)" }}/>
+                <span style={{ position: "absolute", top: -4, right: -4, width: 10, height: 10, borderRadius: "50%", background: "var(--warn)", border: "2px solid var(--bg)" }} />
               )}
             </button>
-            <ITNotifPanel open={showNotifs} onClose={() => setShowNotifs(false)} width={310}/>
+            <ITNotifPanel open={showNotifs} onClose={() => setShowNotifs(false)} width={310} />
           </div>
         </header>
 
         {/* ══════ CAMPAIGNS ══════ */}
-        {activeSection==="tasks" && (
-          <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div className="section-head" style={{ flexShrink:0 }}>
+        {activeSection === "tasks" && (
+          <div className="it-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div className="section-head" style={{ flexShrink: 0 }}>
               <span className="section-title">Request Queue</span>
               <button className="refresh-btn" onClick={handleRefresh} disabled={refreshing}>
                 {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
-            <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
+            <div className="table-wrap" style={{ flex: 1, overflow: "auto" }}>
               {itCampaigns.length === 0 ? (
                 <div className="table-empty">
                   <div className="table-empty-icon">✅</div>
@@ -703,17 +649,17 @@ export default function ITDashboard() {
                 </div>
               ) : (
                 <table>
-                  <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--surface2)" }}>
+                  <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface2)" }}>
                     <tr><th>PM Note</th><th>Scheduled At</th><th>Status</th><th>Action</th><th>Acknowledge</th></tr>
                   </thead>
                   <tbody>
                     {itCampaigns.map(c => (
                       <tr key={c._id}>
-                        <td style={{ maxWidth:320, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.6, padding:"16px 18px" }}>{c.pmMessage||"—"}</td>
-                        <td className="time-cell" style={{ padding:"16px 18px" }}>{fmt(c.scheduleAt)}</td>
-                        <td style={{ padding:"16px 18px" }}><StatusBadge value={c.status}/></td>
-                        <td style={{ padding:"16px 18px" }}><StatusBadge value={c.action}/></td>
-                        <td style={{ padding:"16px 18px" }}>
+                        <td style={{ maxWidth: 320, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.6, padding: "16px 18px" }}>{c.pmMessage || "—"}</td>
+                        <td className="time-cell" style={{ padding: "16px 18px" }}>{fmt(c.scheduleAt)}</td>
+                        <td style={{ padding: "16px 18px" }}><StatusBadge value={c.status} /></td>
+                        <td style={{ padding: "16px 18px" }}><StatusBadge value={c.action} /></td>
+                        <td style={{ padding: "16px 18px" }}>
                           <button className="ack-btn" onClick={() => setAckTarget(c)}>✓ Acknowledge</button>
                         </td>
                       </tr>
@@ -726,33 +672,39 @@ export default function ITDashboard() {
         )}
 
         {/* ══════ SCHEDULE TASKS ══════ */}
-        {activeSection==="schedule-tasks" && (
-          <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div className="section-head" style={{ flexShrink:0 }}>
+        {activeSection === "schedule-tasks" && (
+          <div className="it-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div className="section-head" style={{ flexShrink: 0 }}>
               <span className="section-title">Today's Task Queue</span>
               <button className="refresh-btn" onClick={fetchDueTasks} disabled={taskFetching}>
                 {taskFetching ? "⟳ Loading…" : "⟳ Refresh"}
               </button>
             </div>
-            <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
+            <div className="table-wrap" style={{ flex: 1, overflow: "auto" }}>
               {taskFetching ? (
-                <div className="table-empty"><div className="table-empty-icon" style={{ fontSize:28 }}>⏳</div><div className="table-empty-text">Loading tasks…</div></div>
+                <div className="table-empty">
+                  <div className="table-empty-icon" style={{ fontSize: 28 }}>⏳</div>
+                  <div className="table-empty-text">Loading tasks…</div>
+                </div>
               ) : dailyTasks.length === 0 ? (
-                <div className="table-empty"><div className="table-empty-icon">✅</div><div className="table-empty-text">No tasks due right now. Check back at the scheduled times.</div></div>
+                <div className="table-empty">
+                  <div className="table-empty-icon">✅</div>
+                  <div className="table-empty-text">No tasks due right now. Check back at the scheduled times.</div>
+                </div>
               ) : (
                 <table>
-                  <thead style={{ position:"sticky", top:0, zIndex:1, background:"var(--surface2)" }}>
+                  <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface2)" }}>
                     <tr><th>Task</th><th>Scheduled Time</th><th>Created By</th><th>Acknowledge</th></tr>
                   </thead>
                   <tbody>
                     {dailyTasks.map(t => {
-                      const creatorName = typeof t.createdBy==="object" ? t.createdBy?.username : "PM";
+                      const creatorName = typeof t.createdBy === "object" ? t.createdBy?.username : "PM";
                       return (
                         <tr key={t._id}>
-                          <td style={{ maxWidth:400, wordBreak:"break-word", whiteSpace:"pre-wrap", lineHeight:1.6, padding:"16px 18px" }}>{t.task}</td>
-                          <td className="time-cell" style={{ padding:"16px 18px" }}>{t.time}</td>
-                          <td style={{ padding:"16px 18px", fontSize:13 }}>{creatorName}</td>
-                          <td style={{ padding:"16px 18px" }}>
+                          <td style={{ maxWidth: 400, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.6, padding: "16px 18px" }}>{t.task}</td>
+                          <td className="time-cell" style={{ padding: "16px 18px" }}>{t.time}</td>
+                          <td style={{ padding: "16px 18px", fontSize: 13 }}>{creatorName}</td>
+                          <td style={{ padding: "16px 18px" }}>
                             <button className="ack-btn" onClick={() => setTaskAckTarget(t)}>✓ Acknowledge</button>
                           </td>
                         </tr>
@@ -766,38 +718,37 @@ export default function ITDashboard() {
         )}
 
         {/* ══════ HISTORY ══════ */}
-        {activeSection==="history" && (
-          <div className="it-content" style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:20, marginBottom:16, padding:"10px 16px", background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"var(--radius-sm)", flexShrink:0, flexWrap:"wrap" }}>
-              <span style={{ fontSize:11, color:"var(--muted)", fontFamily:"var(--ff-mono)" }}>IT NOTE border colour:</span>
-              <span style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontFamily:"var(--ff-body)", color:"var(--accent)" }}>
-                <span style={{ display:"inline-block", width:3, height:14, background:"var(--accent)", borderRadius:2 }}/>Done
+        {activeSection === "history" && (
+          <div className="it-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 16, padding: "10px 16px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", flexShrink: 0, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>IT NOTE border colour:</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--ff-body)", color: "var(--accent)" }}>
+                <span style={{ display: "inline-block", width: 3, height: 14, background: "var(--accent)", borderRadius: 2 }} />Done
               </span>
-              <span style={{ display:"flex", alignItems:"center", gap:6, fontSize:11, fontFamily:"var(--ff-body)", color:"var(--warn)" }}>
-                <span style={{ display:"inline-block", width:3, height:14, background:"var(--warn)", borderRadius:2 }}/>Not Done
+              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--ff-body)", color: "var(--warn)" }}>
+                <span style={{ display: "inline-block", width: 3, height: 14, background: "var(--warn)", borderRadius: 2 }} />Not Done
               </span>
             </div>
-            <div className="section-head" style={{ flexShrink:0 }}>
+            <div className="section-head" style={{ flexShrink: 0 }}>
               <span className="section-title">Acknowledgement History</span>
               <button className="refresh-btn" onClick={() => fetchHistory(false)} disabled={historyRefreshing}>
                 {historyRefreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
-            <div className="table-wrap" style={{ flex:1, overflow:"auto" }}>
-              <HistoryTable records={history} loading={historyLoading}/>
+            <div className="table-wrap" style={{ flex: 1, overflow: "auto" }}>
+              <HistoryTable records={history} loading={historyLoading} />
             </div>
           </div>
         )}
       </div>
 
       {/* ── Modals ── */}
-      {ackTarget     && <AckModal campaign={ackTarget} onClose={() => setAckTarget(null)} onConfirm={handleAck} loading={ackLoading}/>}
-      {taskAckTarget && <TaskAckModal task={taskAckTarget} onClose={() => setTaskAckTarget(null)} onConfirm={handleTaskAck} loading={taskAckLoading}/>}
-
-      {currentOverlay && <OverlayNotif notif={currentOverlay} queueLength={overlayQueue.length} onClose={dismissOverlay} onAck={ackFromOverlay}/>}
+      {ackTarget     && <AckModal campaign={ackTarget} onClose={() => setAckTarget(null)} onConfirm={handleAck} loading={ackLoading} />}
+      {taskAckTarget && <TaskAckModal task={taskAckTarget} onClose={() => setTaskAckTarget(null)} onConfirm={handleTaskAck} loading={taskAckLoading} />}
+      {currentOverlay && <OverlayNotif notif={currentOverlay} queueLength={overlayQueue.length} onClose={dismissOverlay} onAck={ackFromOverlay} />}
 
       <div className="toast-container">
-        {toasts.map(t => <div key={t.id} className={`toast ${t.type==="warn"?"warn":""}`}>{t.msg}</div>)}
+        {toasts.map(t => <div key={t.id} className={`toast ${t.type === "warn" ? "warn" : ""}`}>{t.msg}</div>)}
       </div>
     </div>
   );
