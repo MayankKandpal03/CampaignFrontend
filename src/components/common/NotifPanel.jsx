@@ -1,10 +1,8 @@
 /**
  * NotifPanel — premium notification dropdown.
- * Logic (useNotifStore, markRead, clearNotifs) unchanged.
  */
 import { useEffect } from "react";
 import useNotifStore from "../../stores/useNotificationStore.js";
-import { T } from "../../constants/theme.js";
 import { fmt } from "../../utils/formatters.js";
 
 export default function NotifPanel({ open, width = 300 }) {
@@ -17,53 +15,19 @@ export default function NotifPanel({ open, width = 300 }) {
   if (!open) return null;
 
   return (
-    <div style={{
-      position:     "absolute",
-      top:          46,
-      right:        0,
-      width,
-      zIndex:       600,
-      background:   `linear-gradient(160deg, ${T.bgCard}, ${T.bg})`,
-      border:       `1px solid ${T.subtle}`,
-      borderRadius: 12,
-      overflow:     "hidden",
-      boxShadow:    `0 20px 60px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.5)`,
-      animation:    "opsFadeUp .2s cubic-bezier(.22,1,.36,1) both",
-    }}>
+    <div
+      className="absolute top-11.5 right-0 z-600 bg-linear-to-br from-[#141310] to-[#0c0b08] border border-[#2e2c22] rounded-xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5)] animate-[opsFadeUp_0.2s_cubic-bezier(0.22,1,0.36,1)_both]"
+      style={{ width }}
+    >
       {/* Header */}
-      <div style={{
-        padding:        "12px 16px",
-        borderBottom:   `1px solid ${T.subtle}`,
-        display:        "flex",
-        justifyContent: "space-between",
-        alignItems:     "center",
-      }}>
-        <span style={{
-          fontSize:      9,
-          fontWeight:    600,
-          letterSpacing: "0.2em",
-          color:         T.gold,
-          fontFamily:    "'Cinzel', serif",
-          textTransform: "uppercase",
-        }}>
+      <div className="px-4 py-3 border-b border-[#2e2c22] flex justify-between items-center">
+        <span className="text-[9px] font-semibold tracking-[0.2em] text-[#c9a42a] font-['Cinzel',serif] uppercase">
           Notifications
         </span>
         {notifications.length > 0 && (
           <button
             onClick={clearNotifs}
-            style={{
-              background:  "none",
-              border:      "none",
-              color:       T.muted,
-              fontSize:    11,
-              cursor:      "pointer",
-              padding:     "2px 6px",
-              borderRadius:4,
-              fontFamily:  "'DM Sans', sans-serif",
-              transition:  "color .15s ease",
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = T.red}
-            onMouseLeave={e => e.currentTarget.style.color = T.muted}
+            className="bg-transparent border-none text-[#7a7060] text-[11px] cursor-pointer px-1.5 py-0.5 rounded font-['DM_Sans',sans-serif] transition-colors hover:text-[#e05252]"
           >
             Clear all
           </button>
@@ -71,25 +35,11 @@ export default function NotifPanel({ open, width = 300 }) {
       </div>
 
       {/* List */}
-      <div style={{maxHeight:320, overflowY:"auto"}}>
+      <div className="max-h-80 overflow-y-auto">
         {notifications.length === 0 ? (
-          <div style={{
-            padding:    "32px 16px",
-            textAlign:  "center",
-          }}>
-            <div style={{
-              fontSize:      20,
-              marginBottom:  10,
-              opacity:       0.3,
-            }}>
-              ◇
-            </div>
-            <p style={{
-              margin:    0,
-              fontSize:  12,
-              color:     T.muted,
-              fontFamily:"'DM Sans', sans-serif",
-            }}>
+          <div className="py-8 px-4 text-center">
+            <div className="text-xl mb-2.5 opacity-30">◇</div>
+            <p className="m-0 text-xs text-[#7a7060] font-['DM_Sans',sans-serif]">
               No notifications
             </p>
           </div>
@@ -97,29 +47,13 @@ export default function NotifPanel({ open, width = 300 }) {
           notifications.map((n, i) => (
             <div
               key={n.id}
-              style={{
-                padding:      "11px 16px",
-                borderBottom: i < notifications.length - 1 ? `1px solid ${T.subtle}22` : "none",
-                transition:   "background .12s ease",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = T.goldDim}
-              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              className="px-4 py-2.75 transition-colors hover:bg-[rgba(201,164,42,0.13)] cursor-default"
+              style={{ borderBottom: i < notifications.length - 1 ? "1px solid rgba(46,44,34,0.13)" : "none" }}
             >
-              <p style={{
-                margin:     0,
-                fontSize:   12,
-                color:      T.text,
-                lineHeight: 1.5,
-                fontFamily: "'DM Sans', sans-serif",
-              }}>
+              <p className="m-0 text-xs text-[#e8ddc8] leading-relaxed font-['DM_Sans',sans-serif]">
                 {n.message}
               </p>
-              <p style={{
-                margin:     "4px 0 0",
-                fontSize:   9,
-                color:      T.muted,
-                fontFamily: "'JetBrains Mono', monospace",
-              }}>
+              <p className="mt-1 m-0 text-[9px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
                 {fmt(n.time)}
               </p>
             </div>

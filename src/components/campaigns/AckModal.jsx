@@ -1,7 +1,6 @@
 /**
  * AckModal — IT acknowledges a campaign as Done or Not Done.
- * Extracted from ITDashboard where it was defined inline.
- *
+ * Uses it.css classes — logic and class names unchanged.
  * @prop {object}   campaign  - the campaign being acknowledged
  * @prop {Function} onClose
  * @prop {Function} onConfirm - called with { acknowledgement, itMessage }
@@ -48,7 +47,7 @@ export default function AckModal({ campaign, onClose, onConfirm, loading }) {
               rows={3}
             />
             {choice === "not done" && message.trim().length < 4 && (
-              <span style={{ fontSize: 11, color: "var(--warn)" }}>
+              <span className="text-[11px] text-(--warn)">
                 Please add a reason (min 4 chars)
               </span>
             )}

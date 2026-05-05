@@ -1,8 +1,7 @@
 /**
  * FilterCardsGrid — premium filterable status cards.
- * Props and logic unchanged.
+ * Dynamic colors kept inline (runtime values per card).
  */
-import { T } from "../../constants/theme.js";
 
 export default function FilterCardsGrid({
   cards,
@@ -15,15 +14,7 @@ export default function FilterCardsGrid({
   if (!visible) return null;
 
   return (
-    <div style={{
-      display:       "flex",
-      gap:           10,
-      overflowX:     isMobile ? "auto" : "unset",
-      flexWrap:      isMobile ? "nowrap" : "wrap",
-      marginBottom:  22,
-      paddingBottom: isMobile ? 6 : 0,
-      animation:     "opsFadeUp .25s ease",
-    }}>
+    <div className={`flex gap-2.5 mb-5.5 animate-[opsFadeUp_0.25s_ease] ${isMobile ? "overflow-x-auto flex-nowrap pb-1.5" : "flex-wrap"}`}>
       {cards.map(card => {
         const active = activeId === card.id;
         const count  = stats[card.id] ?? 0;
@@ -31,85 +22,59 @@ export default function FilterCardsGrid({
         return (
           <div
             key={card.id}
-            className="ops-fcard"
+            className={`ops-fcard rounded-[10px] cursor-pointer select-none p-[16px_18px_14px] ${isMobile ? "flex-none w-34" : "flex-1 min-w-27.5"}`}
             onClick={() => onSelect(card.id)}
             style={{
-              flex:         isMobile ? "0 0 136px" : "1 1 0",
-              minWidth:     isMobile ? 136 : 110,
-              padding:      "16px 18px 14px",
-              borderRadius: 10,
-              background:   active
+              background: active
                 ? `linear-gradient(135deg, ${card.bg}, rgba(${hexToRgbStr(card.color)}, 0.12))`
-                : T.bgCard,
-              border:       `1px solid ${active ? card.color + "55" : T.subtle}`,
-              cursor:       "pointer",
-              userSelect:   "none",
-              boxShadow:    active
+                : "#141310",
+              border: `1px solid ${active ? card.color + "55" : "#2e2c22"}`,
+              boxShadow: active
                 ? `0 4px 20px rgba(${hexToRgbStr(card.color)}, 0.12), 0 1px 4px rgba(0,0,0,0.3)`
-                : T.shadowSm,
+                : undefined,
             }}
           >
             {/* Label */}
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:11 }}>
-              <span style={{
-                width:        5,
-                height:       5,
-                borderRadius: "50%",
-                background:   active ? card.color : T.muted,
-                flexShrink:   0,
-                boxShadow:    active ? `0 0 6px ${card.color}` : "none",
-                transition:   "all .18s",
-              }}/>
-              <span style={{
-                fontSize:      8.5,
-                fontWeight:    700,
-                letterSpacing: "0.16em",
-                color:         active ? card.color : T.muted,
-                fontFamily:    "'Cinzel', serif",
-                textTransform: "uppercase",
-                transition:    "color .18s",
-              }}>
+            <div className="flex items-center gap-1.5 mb-2.75">
+              <span
+                className="w-1.25 h-1.25 rounded-full shrink-0 transition-all duration-180"
+                style={{
+                  background: active ? card.color : "#7a7060",
+                  boxShadow: active ? `0 0 6px ${card.color}` : "none",
+                }}
+              />
+              <span
+                className="text-[8.5px] font-bold tracking-[0.16em] font-['Cinzel',serif] uppercase transition-[color] duration-180"
+                style={{ color: active ? card.color : "#7a7060" }}
+              >
                 {card.label}
               </span>
             </div>
 
             {/* Count */}
-            <div style={{
-              fontSize:      28,
-              fontWeight:    700,
-              color:         active ? card.color : T.white,
-              fontFamily:    "'Cinzel', serif",
-              lineHeight:    1,
-              letterSpacing: "-0.01em",
-              transition:    "color .18s",
-            }}>
+            <div
+              className="text-[28px] font-bold font-['Cinzel',serif] leading-none tracking-[-0.01em] transition-[color] duration-180"
+              style={{ color: active ? card.color : "#f5edd8" }}
+            >
               {count}
             </div>
 
-            <div style={{
-              fontSize:   9,
-              color:      active ? card.color + "99" : T.muted,
-              marginTop:  5,
-              fontFamily: "'DM Sans', sans-serif",
-              transition: "color .18s",
-            }}>
+            <div
+              className="text-[9px] mt-1.25 font-['DM_Sans',sans-serif] transition-[color] duration-180"
+              style={{ color: active ? card.color + "99" : "#7a7060" }}
+            >
               campaigns
             </div>
 
             {active && (
-              <div style={{
-                marginTop:     9,
-                paddingTop:    9,
-                borderTop:     `1px solid ${card.color}25`,
-                fontSize:      8,
-                color:         card.color,
-                letterSpacing: "0.12em",
-                fontFamily:    "'Cinzel', serif",
-                display:       "flex",
-                alignItems:    "center",
-                gap:           5,
-              }}>
-                <span style={{ width:4, height:4, borderRadius:"50%", background:card.color, animation:"opsPulse 1.8s ease infinite" }}/>
+              <div
+                className="mt-2.25 pt-2.25 text-[8px] tracking-[0.12em] font-['Cinzel',serif] flex items-center gap-1.25"
+                style={{ borderTop: `1px solid ${card.color}25`, color: card.color }}
+              >
+                <span
+                  className="w-1 h-1 rounded-full animate-[opsPulse_1.8s_ease_infinite]"
+                  style={{ background: card.color }}
+                />
                 Filtering
               </div>
             )}

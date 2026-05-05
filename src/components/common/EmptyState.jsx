@@ -2,7 +2,6 @@
  * EmptyState — refined empty placeholder with diamond glyph.
  * Props unchanged.
  */
-import { T } from "../../constants/theme.js";
 
 export default function EmptyState({
   headline = "No Records Found",
@@ -10,57 +9,27 @@ export default function EmptyState({
   action,
 }) {
   return (
-    <div style={{
-      padding:    "60px 24px",
-      textAlign:  "center",
-      animation:  "opsFadeUp .3s ease both",
-    }}>
+    <div className="py-15 px-6 text-center animate-[opsFadeUp_0.3s_ease_both]">
       {/* Diamond glyph */}
-      <div style={{
-        width:          48,
-        height:         48,
-        borderRadius:   12,
-        background:     T.goldDim,
-        border:         `1px solid ${T.goldBorder}`,
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        margin:         "0 auto 18px",
-      }}>
+      <div className="w-12 h-12 rounded-xl bg-[rgba(201,164,42,0.13)] border border-[rgba(201,164,42,0.20)] flex items-center justify-center mx-auto mb-4.5">
         <svg width="20" height="20" viewBox="0 0 36 36" fill="none" aria-hidden="true">
           <polygon points="18,4 32,18 18,32 4,18" fill="none" stroke="rgba(200,168,74,0.4)" strokeWidth="1.5"/>
           <polygon points="18,11 25,18 18,25 11,18" fill="rgba(200,168,74,0.08)" stroke="rgba(200,168,74,0.3)" strokeWidth="1"/>
         </svg>
       </div>
 
-      <p style={{
-        margin:        0,
-        fontSize:      14,
-        fontWeight:    600,
-        color:         T.white,
-        fontFamily:    "'Cinzel', serif",
-        letterSpacing: "0.03em",
-      }}>
+      <p className="m-0 text-sm font-semibold text-[#f5edd8] font-['Cinzel',serif] tracking-[0.03em]">
         {headline}
       </p>
 
       {sub && (
-        <p style={{
-          margin:     "8px 0 0",
-          fontSize:   13,
-          color:      T.muted,
-          lineHeight: 1.6,
-          fontFamily: "'DM Sans', sans-serif",
-          maxWidth:   300,
-          marginLeft: "auto",
-          marginRight:"auto",
-        }}>
+        <p className="mt-2 text-[13px] text-[#7a7060] leading-relaxed font-['DM_Sans',sans-serif] max-w-75 mx-auto">
           {sub}
         </p>
       )}
 
       {action && (
-        <div style={{marginTop:22}}>
+        <div className="mt-5.5">
           {action}
         </div>
       )}

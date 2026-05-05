@@ -1,7 +1,7 @@
 /**
  * ResetPassword — password change form.
- * Extracted from ITDashboard where it was a ~90-line inline component.
- * Now uses the authService layer instead of calling api.post() directly.
+ * Tailwind refactor: removed the single inline style={{ marginBottom: 16 }}
+ * from the success banner. All other classNames use it.css classes.
  */
 import { useState } from "react";
 import { changePassword } from "../../services/authService.js";
@@ -80,7 +80,7 @@ export default function ResetPassword() {
       <div className="form-sub">Update your account password. Choose a strong, unique password.</div>
 
       {success && (
-        <div className="form-success" style={{ marginBottom: 16 }}>
+        <div className="form-success mb-4">
           ✓ Password changed successfully.
         </div>
       )}

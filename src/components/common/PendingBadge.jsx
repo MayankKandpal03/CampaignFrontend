@@ -1,36 +1,11 @@
 /**
  * PendingBadge — refined animated pending indicator.
  */
-import { T } from "../../constants/theme.js";
 
 export default function PendingBadge() {
   return (
-    <span
-      className="ops-pending"
-      style={{
-        display:       "inline-flex",
-        alignItems:    "center",
-        gap:           5,
-        padding:       "3px 9px",
-        borderRadius:  99,
-        background:    "rgba(112,102,88,0.08)",
-        color:         T.muted,
-        fontSize:      9.5,
-        fontWeight:    600,
-        letterSpacing: "0.1em",
-        fontFamily:    "'Cinzel', serif",
-        whiteSpace:    "nowrap",
-        border:        `1px solid ${T.subtle}`,
-        textTransform: "uppercase",
-      }}
-    >
-      <span style={{
-        width:        4,
-        height:       4,
-        borderRadius: "50%",
-        background:   T.muted,
-        flexShrink:   0,
-      }}/>
+    <span className="ops-pending inline-flex items-center gap-1.25 px-2.25 py-0.75 rounded-full bg-[rgba(112,102,88,0.08)] text-[#7a7060] text-[9.5px] font-semibold tracking-widest font-['Cinzel',serif] whitespace-nowrap uppercase border border-[#2e2c22]">
+      <span className="w-1 h-1 rounded-full bg-[#7a7060] shrink-0" />
       Pending
     </span>
   );

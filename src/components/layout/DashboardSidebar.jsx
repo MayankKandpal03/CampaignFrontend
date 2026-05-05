@@ -1,9 +1,6 @@
 /**
  * DashboardSidebar — premium redesign.
- * Props interface and all logic unchanged.
- * Styling: refined navigation, elevated brand mark, polished account section.
  */
-import { T } from "../../constants/theme.js";
 import { initials } from "../../utils/formatters.js";
 import DiamondLogo from "../common/DiamondLogo.jsx";
 
@@ -21,93 +18,34 @@ export default function DashboardSidebar({
 }) {
   return (
     <aside
-      style={{
-        width:         T.sideW,
-        minWidth:      T.sideW,
-        background:    `linear-gradient(180deg, ${T.bgSide} 0%, ${T.bg} 100%)`,
-        borderRight:   `1px solid ${T.subtle}`,
-        display:       "flex",
-        flexDirection: "column",
-        ...(isMobile
-          ? {
-              position:   "fixed",
-              top:        0,
-              left:       open ? 0 : -T.sideW,
-              height:     "100vh",
-              zIndex:     8000,
-              overflowY:  "auto",
-              transition: "left .3s cubic-bezier(.22,1,.36,1)",
-              boxShadow:  open ? "16px 0 60px rgba(0,0,0,.85)" : "none",
-            }
-          : {
-              position:  "sticky",
-              top:       0,
-              height:    "100vh",
-              overflowY: "auto",
-            }),
-      }}
+      className={[
+        "w-56 min-w-56 bg-linear-to-b from-[#0f0e0a] to-[#0c0b08] border-r border-[#2e2c22] flex flex-col",
+        isMobile
+          ? `fixed top-0 left-0 h-screen z-8000 overflow-y-auto transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${open ? "translate-x-0 shadow-[16px_0_60px_rgba(0,0,0,0.85)]" : "-translate-x-full"}`
+          : "sticky top-0 h-screen overflow-y-auto",
+      ].join(" ")}
     >
-      {/* ── Brand ─────────────────────────────────────────────────────────── */}
-      <div style={{
-        padding:     "20px 18px 18px",
-        borderBottom:`1px solid ${T.subtle}`,
-        display:     "flex",
-        alignItems:  "center",
-        gap:         11,
-        flexShrink:  0,
-      }}>
-        <div style={{
-          width:          36,
-          height:         36,
-          borderRadius:   9,
-          background:     T.goldDim,
-          border:         `1px solid ${T.goldBorder}`,
-          display:        "flex",
-          alignItems:     "center",
-          justifyContent: "center",
-          flexShrink:     0,
-        }}>
+      {/* Brand */}
+      <div className="px-4.5 py-5 border-b border-[#2e2c22] flex items-center gap-2.75 shrink-0">
+        <div className="w-9 h-9 rounded-[9px] bg-[rgba(201,164,42,0.13)] border border-[rgba(201,164,42,0.20)] flex items-center justify-center shrink-0">
           <DiamondLogo size={20} />
         </div>
         <div>
-          <p style={{
-            margin:        0,
-            fontSize:      13,
-            fontWeight:    700,
-            color:         T.white,
-            fontFamily:    "'Cinzel', serif",
-            letterSpacing: "0.1em",
-            lineHeight:    1,
-          }}>
+          <p className="m-0 text-[13px] font-bold text-[#f5edd8] font-['Cinzel',serif] tracking-widest leading-none">
             Sat Kartar
           </p>
-          <p style={{
-            margin:        "4px 0 0",
-            fontSize:      8,
-            color:         T.muted,
-            letterSpacing: "0.22em",
-            lineHeight:    1,
-            textTransform: "uppercase",
-          }}>
+          <p className="mt-1 m-0 text-[8px] text-[#7a7060] tracking-[0.22em] leading-none uppercase">
             {brandSub}
           </p>
         </div>
       </div>
 
-      {/* ── Optional extra slot ────────────────────────────────────────────── */}
+      {/* Optional extra slot (e.g. TeamChip) */}
       {extra}
 
-      {/* ── Navigation ────────────────────────────────────────────────────── */}
-      <div style={{padding:"16px 10px 10px", flex:1}}>
-        <p style={{
-          margin:        "0 0 8px 10px",
-          fontSize:      10,
-          color:         "white",
-          letterSpacing: "0.22em",
-          fontFamily:    "'Cinzel', serif",
-          textTransform: "uppercase",
-          
-        }}>
+      {/* Navigation */}
+      <div className="px-2.5 pt-4 pb-2.5 flex-1">
+        <p className="m-0 mb-2 ml-2.5 text-[10px] text-white tracking-[0.22em] font-['Cinzel',serif] uppercase">
           Navigation
         </p>
 
@@ -116,56 +54,18 @@ export default function DashboardSidebar({
           return (
             <button
               key={item.id}
-              className="ops-nav-btn"
+              className={`ops-nav-btn flex items-center gap-2.5 w-full px-3 py-2.25 rounded-[7px] border-none text-[13px] cursor-pointer mb-0.5 font-['DM_Sans',sans-serif] text-left relative overflow-hidden transition-all duration-160 ${
+                active
+                  ? "bg-[rgba(201,164,42,0.13)] text-[#c9a42a] font-medium shadow-[inset_2px_0_0_#c9a42a]"
+                  : "bg-transparent text-[#7a7060] font-normal"
+              }`}
               onClick={() => onNavigate(item.id)}
-              style={{
-                display:      "flex",
-                alignItems:   "center",
-                gap:          10,
-                width:        "100%",
-                padding:      "9px 12px 9px 10px",
-                borderRadius: 7,
-                background:   active ? T.goldDim : "transparent",
-                border:       "none",
-                color:        active ? T.gold : T.muted,
-                fontSize:     13,
-                fontWeight:   active ? 500 : 400,
-                cursor:       "pointer",
-                marginBottom: 2,
-                fontFamily:   "'DM Sans', sans-serif",
-                textAlign:    "left",
-                position:     "relative",
-                overflow:     "hidden",
-                transition:   "all .16s ease",
-                boxShadow:    active ? `inset 2px 0 0 ${T.gold}` : "none",
-              }}
             >
-              {/* Active pip */}
-              <span style={{
-                width:        5,
-                height:       5,
-                borderRadius: "50%",
-                flexShrink:   0,
-                background:   active ? T.gold : "transparent",
-                border:       `1px solid ${active ? T.gold : T.subtle}`,
-                transition:   "all .16s ease",
-              }}/>
+              <span className={`w-1.25h-[5px] rounded-full shrink-0 transition-all duration-160 ${active ? "bg-[#c9a42a] border-[#c9a42a]" : "bg-transparent border border-[#2e2c22]"}`}/>
+              <span className="flex-1 leading-[1.2]">{item.label}</span>
 
-              <span style={{flex:1, lineHeight:1.2}}>{item.label}</span>
-
-              {/* Count badge */}
               {item.count > 0 && (
-                <span style={{
-                  padding:      "2px 7px",
-                  borderRadius: 99,
-                  background:   active ? T.gold        : T.subtle,
-                  color:        active ? "#0c0906"     : T.muted,
-                  fontSize:     9,
-                  fontFamily:   "'JetBrains Mono', monospace",
-                  fontWeight:   700,
-                  transition:   "all .16s ease",
-                  lineHeight:   1.4,
-                }}>
+                <span className={`px-1.75 py-0.5 rounded-full text-[9px] font-['JetBrains_Mono',monospace] font-bold leading-[1.4] transition-all duration-160 ${active ? "bg-[#c9a42a] text-[#0c0906]" : "bg-[#2e2c22] text-[#7a7060]"}`}>
                   {item.count}
                 </span>
               )}
@@ -174,73 +74,22 @@ export default function DashboardSidebar({
         })}
       </div>
 
-      {/* ── Account / Sign-out ─────────────────────────────────────────────── */}
-      <div style={{
-        padding:    "14px 14px 18px",
-        borderTop:  `1px solid ${T.subtle}`,
-        flexShrink: 0,
-      }}>
-        <p style={{
-          margin:        "0 0 10px 2px",
-          fontSize:      10,
-          letterSpacing: "0.22em",
-          color:         "white",
-          fontFamily:    "'Cinzel', serif",
-          textTransform: "uppercase",
-          
-        }}>
+      {/* Account / Sign-out */}
+      <div className="px-3.5 pb-4.5 pt-pt-3.5rder-t border-[#2e2c22] shrink-0">
+        <p className="m-0 mb-2.5 ml-0.5 text-[10px] text-white tracking-[0.22em] font-['Cinzel',serif] uppercase">
           Account
         </p>
 
         {/* User info */}
-        <div style={{
-          display:      "flex",
-          alignItems:   "center",
-          gap:          10,
-          marginBottom: 12,
-          padding:      "8px 10px",
-          borderRadius: 8,
-          background:   T.goldDim,
-          border:       `1px solid ${T.goldBorder}`,
-        }}>
-          <div style={{
-            width:          30,
-            height:         30,
-            borderRadius:   "50%",
-            background:     `linear-gradient(135deg, ${T.goldDim}, rgba(200,168,74,0.2))`,
-            border:         `1px solid ${T.goldBorder}`,
-            display:        "flex",
-            alignItems:     "center",
-            justifyContent: "center",
-            fontSize:       11,
-            fontWeight:     700,
-            color:          T.gold,
-            fontFamily:     "'Cinzel', serif",
-            flexShrink:     0,
-          }}>
+        <div className="flex items-center gap-2.5 mb-3 px-2.5 py-2 rounded-lg bg-[rgba(201,164,42,0.13)] border border-[rgba(201,164,42,0.20)]">
+          <div className="w-7.5 h-7.5 rounded-full bg-linear-to-br from-[rgba(201,164,42,0.13)] to-[rgba(200,168,74,0.2)] border border-[rgba(201,164,42,0.20)] flex items-center justify-center text-[11px] font-bold text-[#c9a42a] font-['Cinzel',serif] shrink-0">
             {initials(user || "U")}
           </div>
-          <div style={{overflow:"hidden", flex:1}}>
-            <p style={{
-              margin:       0,
-              fontSize:     12,
-              fontWeight:   500,
-              color:        T.white,
-              overflow:     "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace:   "nowrap",
-              fontFamily:   "'DM Sans', sans-serif",
-            }}>
+          <div className="overflow-hidden flex-1">
+            <p className="m-0 text-xs font-medium text-[#f5edd8] overflow-hidden text-ellipsis whitespace-nowrap font-['DM_Sans',sans-serif]">
               {user || "User"}
             </p>
-            <p style={{
-              margin:        0,
-              fontSize:      8,
-              color:         T.muted,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              marginTop:     2,
-            }}>
+            <p className="m-0 mt-0.5 text-[8px] text-[#7a7060] tracking-[0.12em] uppercase">
               {(role || "").toUpperCase()}
             </p>
           </div>
@@ -249,34 +98,7 @@ export default function DashboardSidebar({
         {/* Sign-out */}
         <button
           onClick={onLogout}
-          style={{
-            width:         "100%",
-            padding:       "8px",
-            borderRadius:  7,
-            cursor:        "pointer",
-            background:    "transparent",
-            border:        `1px solid ${T.subtle}`,
-            color:         T.muted,
-            fontSize:      10,
-            letterSpacing: "0.14em",
-            fontFamily:    "'Cinzel', serif",
-            textTransform: "uppercase",
-            transition:    "all .18s ease",
-            display:       "flex",
-            alignItems:    "center",
-            justifyContent:"center",
-            gap:           7,
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor  = T.red;
-            e.currentTarget.style.color        = T.red;
-            e.currentTarget.style.background   = T.redBg;
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor  = T.subtle;
-            e.currentTarget.style.color        = T.muted;
-            e.currentTarget.style.background   = "transparent";
-          }}
+          className="w-full py-2 rounded-[7px] cursor-pointer bg-transparent border border-[#2e2c22] text-[#7a7060] text-[10px] tracking-[0.14em] font-['Cinzel',serif] uppercase transition-all duration-180x items-center justify-center gap-1.75 hover:border-[#e05252] hover:text-[#e05252] hover:bg-[rgba(224,82,82,0.12)]"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>

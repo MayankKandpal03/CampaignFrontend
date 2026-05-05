@@ -1,37 +1,26 @@
 /**
  * ActionModal — PM approves or cancels a campaign.
- *
- * TIMEZONE FIX:
- * scheduleAt from a datetime-local input is in local time (IST for Indian users).
- * We convert to UTC ISO via new Date(value).toISOString() before sending to
- * the server so the Node.js backend receives an unambiguous timestamp.
+ * Refactored to Tailwind CSS.
+ * TIMEZONE FIX preserved: convert local datetime to UTC before sending.
  */
 import { useState, useEffect } from "react";
-import { T, inputSx } from "../../constants/theme.js";
 import Field from "../common/Field.jsx";
 import { fmt, toLocalISO, localToUTC } from "../../utils/formatters.js";
+
+const INPUT_CX =
+  "w-full bg-[#0a0908] border border-[#2e2c22] text-[#e8ddc8] text-[13px] px-[14px] py-[11px] outline-none font-['DM_Sans',sans-serif] transition-[border-color,box-shadow] duration-200";
 
 export default function ActionModal({ campaign, onClose, onSave }) {
   const [action, setAction] = useState("approve");
   const [pmMessage, setPmMessage] = useState("");
-
-  /**
-   * FIX: Default scheduleAt to requestedAt (not current time and not an
-   * existing scheduleAt — since scheduleAt is now empty on creation).
-   * This satisfies requirement: "default to current requested time unless
-   * the PM manually changes it".
-   */
   const [scheduleAt, setScheduleAt] = useState(
     toLocalISO(campaign?.requestedAt) || toLocalISO(new Date()),
   );
-
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    const h = (e) => {
-      if (e.key === "Escape") onClose();
-    };
+    const h = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
@@ -46,11 +35,6 @@ export default function ActionModal({ campaign, onClose, onSave }) {
       await onSave(campaign._id, {
         action,
         pmMessage: pmMessage.trim() || undefined,
-        /**
-         * FIX: Convert datetime-local value → UTC ISO string before sending.
-         * localToUTC("2024-01-15T14:30") in IST browser → "2024-01-15T09:00:00.000Z"
-         * Node.js server then correctly computes delay from this UTC epoch.
-         */
         scheduleAt:
           action === "approve"
             ? localToUTC(scheduleAt) || new Date().toISOString()
@@ -65,211 +49,58 @@ export default function ActionModal({ campaign, onClose, onSave }) {
   };
 
   const ACTIONS = [
-    {
-      val: "approve",
-      label: "Approve",
-      desc: "Forward to IT queue",
-      color: T.teal,
-      bg: T.tealBg,
-    },
-    {
-      val: "cancel",
-      label: "Reject",
-      desc: "Reject this campaign",
-      color: T.red,
-      bg: T.redBg,
-    },
+    { val: "approve", label: "Approve", desc: "Forward to IT queue",  color: "#3ecfb2", bg: "rgba(62,207,178,0.11)"  },
+    { val: "cancel",  label: "Reject",  desc: "Reject this campaign", color: "#e05252", bg: "rgba(224,82,82,0.12)"  },
   ];
 
   return (
     <div
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 9000,
-        background: "rgba(0,0,0,0.78)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      className="fixed inset-0 z-9000 bg-black/78 backdrop-blur-sm flex items-center justify-center p-4"
     >
-      <div
-        style={{
-          background: `linear-gradient(160deg, ${T.bgCard}, ${T.bg})`,
-          border: `1px solid ${T.subtle}`,
-          borderRadius: 14,
-          padding: "28px 28px 24px",
-          width: "100%",
-          maxWidth: 510,
-          boxShadow: `0 24px 64px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.5)`,
-          animation: "opsIn 0.24s cubic-bezier(.22,1,.36,1)",
-        }}
-      >
+      <div className="bg-[linear-gradient(160deg,#141310,#0c0b08)] border border-[#2e2c22] rounded-[14px] px-7 pt-7 pb-6 w-full max-w-127.5 shadow-[0_24px_64px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5)] animate-[opsIn_0.24s_cubic-bezier(.22,1,.36,1)]">
+
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: 20,
-          }}
-        >
+        <div className="flex justify-between items-start mb-5">
           <div>
-            <p
-              style={{
-                margin: "0 0 6px",
-                fontSize: 8,
-                letterSpacing: "0.22em",
-                color: "rgba(200,168,74,0.6)",
-                fontFamily: "'Cinzel',serif",
-                textTransform: "uppercase",
-              }}
-            >
+            <p className="m-0 mb-1.5 text-[8px] tracking-[0.22em] text-[rgba(200,168,74,0.6)] font-[Cinzel,serif] uppercase">
               PM Review
             </p>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 18,
-                fontWeight: 600,
-                color: T.white,
-                fontFamily: "'Cinzel',serif",
-                letterSpacing: "0.02em",
-              }}
-            >
+            <h3 className="m-0 text-[18px] font-semibold text-[#f5edd8] font-[Cinzel,serif] tracking-[0.02em]">
               Campaign Decision
             </h3>
           </div>
           <button
             onClick={onClose}
-            style={{
-              width: 30,
-              height: 30,
-              borderRadius: 7,
-              background: "transparent",
-              border: `1px solid ${T.subtle}`,
-              color: T.muted,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              transition: "all 0.15s ease",
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = T.red;
-              e.currentTarget.style.color = T.red;
-              e.currentTarget.style.background = T.redBg;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = T.subtle;
-              e.currentTarget.style.color = T.muted;
-              e.currentTarget.style.background = "transparent";
-            }}
+            className="w-7.5 h-7.5 rounded-[7px] bg-transparent border border-[#2e2c22] text-[#7a7060] cursor-pointer flex items-center justify-center transition-all duration-150 shrink-0 hover:border-[#e05252] hover:text-[#e05252] hover:bg-[rgba(224,82,82,0.12)]"
           >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
 
         {/* Campaign preview */}
-        <div
-          style={{
-            padding: "12px 16px",
-            background: T.bgInput,
-            border: `1px solid ${T.subtle}`,
-            borderRadius: 8,
-            marginBottom: 20,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "10px 20px",
-          }}
-        >
+        <div className="px-4 py-3 bg-[#0a0908] border border-[#2e2c22] rounded-lg mb-5 grid grid-cols-2 gap-x-5 gap-y-2.5">
           <div>
-            <p
-              style={{
-                margin: "0 0 4px",
-                fontSize: 8,
-                letterSpacing: "0.12em",
-                color: T.muted,
-                fontFamily: "'Cinzel',serif",
-                textTransform: "uppercase",
-              }}
-            >
-              Message
-            </p>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12,
-                color: T.text,
-                lineHeight: 1.55,
-                wordBreak: "break-word",
-              }}
-            >
-              {campaign.message}
-            </p>
+            <p className="m-0 mb-1 text-[8px] tracking-[0.12em] text-[#7a7060] font-[Cinzel,serif] uppercase">Message</p>
+            <p className="m-0 text-[12px] text-[#e8ddc8] leading-[1.55] wrap-break-word">{campaign.message}</p>
           </div>
           <div>
-            <p
-              style={{
-                margin: "0 0 4px",
-                fontSize: 8,
-                letterSpacing: "0.12em",
-                color: T.muted,
-                fontFamily: "'Cinzel',serif",
-                textTransform: "uppercase",
-              }}
-            >
-              Submitted
-            </p>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 11,
-                color: T.muted,
-                fontFamily: "'JetBrains Mono',monospace",
-              }}
-            >
-              {fmt(campaign.createdAt)}
-            </p>
+            <p className="m-0 mb-1 text-[8px] tracking-[0.12em] text-[#7a7060] font-[Cinzel,serif] uppercase">Submitted</p>
+            <p className="m-0 text-[11px] text-[#7a7060] font-['JetBrains_Mono',monospace]">{fmt(campaign.createdAt)}</p>
           </div>
         </div>
 
         {err && (
-          <div
-            style={{
-              padding: "10px 14px",
-              background: T.redBg,
-              border: `1px solid ${T.red}44`,
-              borderRadius: 8,
-              color: T.red,
-              fontSize: 12,
-              marginBottom: 16,
-            }}
-          >
+          <div className="px-3.5 py-2.5 bg-[rgba(224,82,82,0.12)] border border-[#e05252]/27 rounded-lg text-[#e05252] text-[12px] mb-4">
             {err}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <Field label="Decision">
-            <div style={{ display: "flex", gap: 10 }}>
+            <div className="flex gap-2.5">
               {ACTIONS.map(({ val, label, desc, color, bg }) => {
                 const active = action === val;
                 return (
@@ -277,50 +108,17 @@ export default function ActionModal({ campaign, onClose, onSave }) {
                     key={val}
                     type="button"
                     onClick={() => setAction(val)}
+                    className="flex-1 py-3 px-2.5 rounded-lg cursor-pointer transition-all duration-150"
                     style={{
-                      flex: 1,
-                      padding: "12px 10px",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      background: active ? bg : T.bgInput,
-                      border: `1px solid ${active ? color : T.subtle}`,
-                      color: active ? color : T.muted,
-                      transition: "all 0.15s ease",
+                      background: active ? bg : "#0a0908",
+                      border: `1px solid ${active ? color : "#2e2c22"}`,
+                      color: active ? color : "#7a7060",
                     }}
-                    onMouseEnter={(e) => {
-                      if (!active) {
-                        e.currentTarget.style.borderColor = `${color}66`;
-                        e.currentTarget.style.color = color;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!active) {
-                        e.currentTarget.style.borderColor = T.subtle;
-                        e.currentTarget.style.color = T.muted;
-                      }
-                    }}
+                    onMouseEnter={(e) => { if (!active) { e.currentTarget.style.borderColor = `${color}66`; e.currentTarget.style.color = color; } }}
+                    onMouseLeave={(e) => { if (!active) { e.currentTarget.style.borderColor = "#2e2c22"; e.currentTarget.style.color = "#7a7060"; } }}
                   >
-                    <div
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        letterSpacing: "0.12em",
-                        fontFamily: "'Cinzel',serif",
-                        textTransform: "uppercase",
-                        marginBottom: 3,
-                      }}
-                    >
-                      {label}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        opacity: 0.65,
-                        fontFamily: "'DM Sans',sans-serif",
-                      }}
-                    >
-                      {desc}
-                    </div>
+                    <div className="text-[10px] font-bold tracking-[0.12em] font-[Cinzel,serif] uppercase mb-0.75">{label}</div>
+                    <div className="text-[10px] opacity-65 font-['DM_Sans',sans-serif]">{desc}</div>
                   </button>
                 );
               })}
@@ -329,16 +127,11 @@ export default function ActionModal({ campaign, onClose, onSave }) {
 
           <Field label="PM Message" hint="optional">
             <textarea
-              className="ops-focus"
+              className={`ops-focus ${INPUT_CX} rounded-lg resize-y leading-[1.6]`}
               value={pmMessage}
               onChange={(e) => setPmMessage(e.target.value)}
-              placeholder={
-                action === "approve"
-                  ? "Add a note for IT (optional)…"
-                  : "Reason for rejection (optional)…"
-              }
+              placeholder={action === "approve" ? "Add a note for IT (optional)…" : "Reason for rejection (optional)…"}
               rows={3}
-              style={{ ...inputSx, borderRadius: 8, resize: "vertical", lineHeight: 1.6 }}
             />
           </Field>
 
@@ -346,101 +139,44 @@ export default function ActionModal({ campaign, onClose, onSave }) {
             <Field label="Schedule At" hint="defaults to requested time">
               <input
                 type="datetime-local"
-                className="ops-focus"
+                className={`ops-focus ${INPUT_CX} rounded-lg`}
+                style={{ colorScheme: "dark" }}
                 value={scheduleAt}
                 onChange={(e) => setScheduleAt(e.target.value)}
-                style={{ ...inputSx, borderRadius: 8, colorScheme: "dark" }}
               />
             </Field>
           )}
 
           {action === "cancel" && (
-            <div
-              style={{
-                padding: "12px 14px",
-                background: T.redBg,
-                border: `1px solid ${T.red}30`,
-                borderRadius: 8,
-                marginBottom: 18,
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: "#f09090",
-                  lineHeight: 1.65,
-                  fontFamily: "'DM Sans',sans-serif",
-                }}
-              >
-                ⚠ This will permanently{" "}
-                <strong style={{ color: T.red }}>cancel</strong> the campaign.
-                The creator will be notified.
+            <div className="px-3.5 py-3 bg-[rgba(224,82,82,0.12)] border border-[#e05252]/19 rounded-lg mb-4.5">
+              <p className="m-0 text-[12px] text-[#f09090] leading-[1.65] font-['DM_Sans',sans-serif]">
+                ⚠ This will permanently <strong className="text-[#e05252]">cancel</strong> the campaign. The creator will be notified.
               </p>
             </div>
           )}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <div className="flex gap-2.5 mt-2">
             <button
               type="button"
               onClick={onClose}
-              style={{
-                flex: 1,
-                padding: "11px",
-                borderRadius: 8,
-                cursor: "pointer",
-                background: "transparent",
-                border: `1px solid ${T.subtle}`,
-                color: T.muted,
-                fontSize: 11,
-                letterSpacing: "0.1em",
-                fontFamily: "'Cinzel',serif",
-                textTransform: "uppercase",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = T.goldBorder;
-                e.currentTarget.style.color = T.gold;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = T.subtle;
-                e.currentTarget.style.color = T.muted;
-              }}
+              className="flex-1 py-2.75 rounded-lg cursor-pointer bg-transparent border border-[#2e2c22] text-[#7a7060] text-[11px] tracking-widest font-[Cinzel,serif] uppercase transition-all duration-150 hover:border-[rgba(201,164,42,0.20)] hover:text-[#c9a42a]"
             >
               Discard
             </button>
             <button
               type="submit"
               disabled={busy}
+              className="flex-2 py-2.75 rounded-lg text-[11px] font-bold tracking-[0.12em] font-[Cinzel,serif] uppercase transition-all duration-150"
               style={{
-                flex: 2,
-                padding: "11px",
-                borderRadius: 8,
                 cursor: busy ? "not-allowed" : "pointer",
                 opacity: busy ? 0.6 : 1,
-                background:
-                  action === "cancel"
-                    ? T.redBg
-                    : `linear-gradient(135deg, ${T.gold}, #d4b44e)`,
-                border: `1px solid ${action === "cancel" ? `${T.red}55` : T.gold}`,
-                color: action === "cancel" ? T.red : "#0c0906",
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: "0.12em",
-                fontFamily: "'Cinzel',serif",
-                textTransform: "uppercase",
-                transition: "all 0.15s ease",
-                boxShadow:
-                  action !== "cancel"
-                    ? "0 2px 10px rgba(200,168,74,0.18)"
-                    : "none",
+                background: action === "cancel" ? "rgba(224,82,82,0.12)" : "linear-gradient(135deg,#c9a42a,#d4b44e)",
+                border: `1px solid ${action === "cancel" ? "rgba(224,82,82,0.33)" : "#c9a42a"}`,
+                color: action === "cancel" ? "#e05252" : "#0c0906",
+                boxShadow: action !== "cancel" ? "0 2px 10px rgba(200,168,74,0.18)" : "none",
               }}
             >
-              {busy
-                ? "Saving…"
-                : action === "cancel"
-                  ? "Confirm Reject"
-                  : "Confirm Approve"}
+              {busy ? "Saving…" : action === "cancel" ? "Confirm Reject" : "Confirm Approve"}
             </button>
           </div>
         </form>

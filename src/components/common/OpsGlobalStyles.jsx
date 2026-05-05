@@ -1,6 +1,11 @@
 /**
  * OpsGlobalStyles — premium animation system and shared utility classes.
  * Injects keyframes, refined hover states, and smooth interactions.
+ *
+ * BUG FIX: Added global `input, textarea, select` color rules.
+ * When components were converted from `inputSx` (which included `color: T.text`)
+ * to Tailwind classes, some forgot `text-[#e8ddc8]`. The browser default is
+ * black text, making inputs invisible on dark backgrounds.
  */
 import { T } from "../../constants/theme.js";
 
@@ -9,6 +14,24 @@ export default function OpsGlobalStyles() {
     <style>{`
       /* ── Font rendering ─────────────────────────────────────────────────── */
       * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+      /* ── Global input text color fix ────────────────────────────────────── */
+      /* Prevents black text on dark backgrounds after Tailwind conversion     */
+      input, textarea, select {
+        color: ${T.text};
+        background: ${T.bgInput};
+      }
+      input::placeholder,
+      textarea::placeholder {
+        color: ${T.muted};
+        opacity: 1;
+      }
+      /* datetime-local and time inputs need explicit dark color-scheme */
+      input[type="datetime-local"],
+      input[type="time"],
+      input[type="date"] {
+        color-scheme: dark;
+      }
 
       /* ── Keyframes ──────────────────────────────────────────────────────── */
       @keyframes opsIn {
@@ -45,6 +68,7 @@ export default function OpsGlobalStyles() {
         box-shadow: 0 0 0 3px ${T.goldDim}, 0 1px 2px rgba(0,0,0,0.3) !important;
         outline: none;
         background: ${T.bgInput} !important;
+        color: ${T.text} !important;
       }
       button:focus-visible {
         outline: 2px solid ${T.gold};

@@ -1,9 +1,7 @@
 /**
  * DeleteUserModal — confirms permanent user removal.
- * All logic unchanged. Only styling updated.
  */
 import { useState, useEffect } from "react";
-import { T } from "../../constants/theme.js";
 import RoleBadge from "../common/RoleBadge.jsx";
 
 export default function DeleteUserModal({ target, onClose, onConfirm, title = "Delete User" }) {
@@ -34,103 +32,52 @@ export default function DeleteUserModal({ target, onClose, onConfirm, title = "D
   return (
     <div
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-      style={{
-        position:       "fixed",
-        inset:          0,
-        zIndex:         9000,
-        background:     "rgba(0,0,0,0.8)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        padding:        16,
-      }}
+      className="fixed inset-0 z-9000 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
     >
-      <div style={{
-        background:   `linear-gradient(160deg, ${T.bgCard}, ${T.bg})`,
-        border:       `1px solid rgba(220,82,82,0.3)`,
-        borderRadius: 14,
-        padding:      "28px 28px 24px",
-        width:        "100%",
-        maxWidth:     408,
-        boxShadow:    `0 24px 64px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(220,82,82,0.1)`,
-        animation:    "opsIn 0.24s cubic-bezier(.22,1,.36,1)",
-      }}>
+      <div className="bg-linear-to-br from-[#141310] to-[#0c0b08] border border-[rgba(220,82,82,0.3)] rounded-[14px] p-7 w-full max-w-102 shadow-[0_24px_64px_rgba(0,0,0,0.7),0_4px_16px_rgba(0,0,0,0.5),0_0_0_1px_rgba(220,82,82,0.1)] animate-[opsIn_0.24s_cubic-bezier(0.22,1,0.36,1)]">
 
         {/* Header */}
-        <div style={{marginBottom:18}}>
-          <div style={{
-            display:     "flex",
-            alignItems:  "center",
-            gap:         8,
-            marginBottom:8,
-          }}>
-            <div style={{
-              width:          28,
-              height:         28,
-              borderRadius:   7,
-              background:     T.redBg,
-              border:         `1px solid ${T.red}44`,
-              display:        "flex",
-              alignItems:     "center",
-              justifyContent: "center",
-            }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.red} strokeWidth="2.5">
+        <div className="mb-4.5">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 rounded-[7px] bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.27)] flex items-center justify-center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e05252" strokeWidth="2.5">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
               </svg>
             </div>
-            <p style={{ margin:0, fontSize:8, letterSpacing:"0.2em", color:T.red, fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>
+            <p className="m-0 text-[8px] tracking-[0.2em] text-[#e05252] font-['Cinzel',serif] uppercase">
               Danger Zone
             </p>
           </div>
-          <h3 style={{ margin:0, fontSize:17, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>
+          <h3 className="m-0 text-[17px] font-semibold text-[#f5edd8] font-['Cinzel',serif]">
             {title}
           </h3>
         </div>
 
         {/* User preview */}
-        <div style={{
-          padding:"12px 14px", background:T.bgInput,
-          border:`1px solid ${T.subtle}`, borderRadius:8, marginBottom:14,
-        }}>
-          <p style={{ margin:"0 0 3px", fontSize:13, fontWeight:500, color:T.text, fontFamily:"'Cinzel',serif" }}>
-            {target.username}
-          </p>
-          <p style={{ margin:"0 0 8px", fontSize:11, color:T.muted, fontFamily:"'JetBrains Mono',monospace" }}>
-            {target.email}
-          </p>
+        <div className="px-3.5 py-3 bg-[#0a0908] border border-[#2e2c22] rounded-lg mb-3.5">
+          <p className="m-0 mb-0.75 text-[13px] font-medium text-[#e8ddc8] font-['Cinzel',serif]">{target.username}</p>
+          <p className="m-0 mb-2 text-[11px] text-[#7a7060] font-['JetBrains_Mono',monospace]">{target.email}</p>
           {target.role && <RoleBadge role={target.role}/>}
         </div>
 
         {/* Warning */}
-        <div style={{
-          padding:"10px 14px", background:T.redBg,
-          border:`1px solid ${T.red}25`, borderRadius:8, marginBottom:18,
-        }}>
-          <p style={{ margin:0, fontSize:12, color:"#f09090", lineHeight:1.65, fontFamily:"'DM Sans',sans-serif" }}>
-            This action is <strong style={{color:T.red}}>permanent</strong>. The user will be removed from all teams and will no longer be able to log in.
+        <div className="px-3.5 py-2.5 bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.15)] rounded-lg mb-4.5">
+          <p className="m-0 text-xs text-[#f09090] leading-[1.65] font-['DM_Sans',sans-serif]">
+            This action is <strong className="text-[#e05252]">permanent</strong>. The user will be removed from all teams and will no longer be able to log in.
           </p>
         </div>
 
         {err && (
-          <div style={{ padding:"9px 13px", background:T.redBg, borderRadius:8, color:T.red, fontSize:12, marginBottom:14 }}>
+          <div className="px-3.25 py-2.25 bg-[rgba(224,82,82,0.12)] rounded-lg text-[#e05252] text-xs mb-3.5">
             {err}
           </div>
         )}
 
-        <div style={{ display:"flex", gap:10 }}>
+        <div className="flex gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            style={{
-              flex:1, padding:"11px", borderRadius:8, cursor:"pointer",
-              background:"transparent", border:`1px solid ${T.subtle}`,
-              color:T.muted, fontSize:11, letterSpacing:"0.1em",
-              fontFamily:"'Cinzel',serif", textTransform:"uppercase", transition:"all 0.15s ease",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = T.goldBorder; e.currentTarget.style.color = T.gold; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = T.subtle; e.currentTarget.style.color = T.muted; }}
+            className="flex-1 py-2.75 rounded-lg cursor-pointer bg-transparent border border-[#2e2c22] text-[#7a7060] text-[11px] tracking-widest font-['Cinzel',serif] uppercase transition-all duration-150 hover:border-[rgba(201,164,42,0.20)] hover:text-[#c9a42a]"
           >
             Cancel
           </button>
@@ -138,16 +85,7 @@ export default function DeleteUserModal({ target, onClose, onConfirm, title = "D
             type="button"
             onClick={handle}
             disabled={busy}
-            style={{
-              flex:2, padding:"11px", borderRadius:8,
-              cursor:busy ? "not-allowed" : "pointer",
-              opacity:busy ? 0.6 : 1,
-              background:T.redBg, border:`1px solid ${T.red}55`,
-              color:T.red, fontSize:11, fontWeight:700, letterSpacing:"0.12em",
-              fontFamily:"'Cinzel',serif", textTransform:"uppercase", transition:"all 0.15s ease",
-            }}
-            onMouseEnter={e => { if (!busy) e.currentTarget.style.background = "rgba(220,82,82,0.2)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = T.redBg; }}
+            className="flex-2 py-2.75 rounded-lg bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.33)] text-[#e05252] text-[11px] font-bold tracking-[0.12em] font-['Cinzel',serif] uppercase transition-all duration-150 hover:bg-[rgba(220,82,82,0.2)] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
           >
             {busy ? "Deleting…" : "Confirm Delete"}
           </button>

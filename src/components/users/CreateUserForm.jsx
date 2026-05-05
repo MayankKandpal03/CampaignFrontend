@@ -1,18 +1,7 @@
 /**
  * CreateUserForm — role-aware user creation form.
- *
- * Manager version  : role is locked to "ppc", no selector shown.
- * PM version       : role is selectable (manager | process manager | it).
- *
- * Previously inlined separately in ManagerDashboard and PMDashboard with
- * duplicate field structure and submit logic. Now unified via `allowedRoles`.
- *
- * @prop {string[]}  allowedRoles  - roles to show in the selector; if length===1
- *                                   the selector is hidden and that role is used.
- * @prop {Function}  onSuccess     - called after successful creation; receives username.
  */
 import { useState } from "react";
-import { T, inputSx } from "../../constants/theme.js";
 import Field from "../common/Field.jsx";
 import GoldBtn from "../common/GoldBtn.jsx";
 import { createUser } from "../../services/userService.js";
@@ -65,74 +54,61 @@ export default function CreateUserForm({ allowedRoles = ["ppc"], onSuccess }) {
     }
   };
 
-  const showSelector = allowedRoles.length > 1;
+  const inputCls = "ops-focus w-full box-border bg-[#0a0908] border border-[#2e2c22] rounded text-[#e8ddc8] text-[13px] px-[14px] py-[11px] outline-none font-['DM_Sans',sans-serif] transition-[border-color,box-shadow] duration-200";
 
   return (
     <form onSubmit={handleSubmit}>
       {error && (
-        <div style={{
-          padding: "10px 14px", borderRadius: 3, marginBottom: 16,
-          background: T.redBg, border: `1px solid ${T.red}44`,
-          color: T.red, fontSize: 12,
-        }}>
+        <div className="px-3.5 py-2.5 rounded mb-4 bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.27)] text-[#e05252] text-xs">
           {error}
         </div>
       )}
 
       {ok && (
-        <div style={{
-          padding: "10px 14px", borderRadius: 3, marginBottom: 16,
-          background: T.greenBg, border: `1px solid ${T.green}44`,
-          color: T.green, fontSize: 11, fontFamily: "'Cinzel', serif",
-          letterSpacing: "0.08em",
-        }}>
+        <div className="px-3.5 py-2.5 rounded mb-4 bg-[rgba(76,187,127,0.11)] border border-[rgba(76,187,127,0.27)] text-[#4cbb7f] text-[11px] font-['Cinzel',serif] tracking-[0.08em]">
           ✓ USER CREATED SUCCESSFULLY
         </div>
       )}
 
       <Field label="USERNAME" hint="required">
         <input
-          className="ops-focus"
+          className={inputCls}
           type="text"
           value={form.username}
           onChange={handleChange("username")}
           placeholder="e.g. john_doe"
           required
-          style={inputSx}
         />
       </Field>
 
       <Field label="EMAIL" hint="required — must be @satkartar.com or @skinrange.com">
         <input
-          className="ops-focus"
+          className={inputCls}
           type="email"
           value={form.email}
           onChange={handleChange("email")}
           placeholder="user@satkartar.com"
           required
-          style={inputSx}
         />
       </Field>
 
       <Field label="PASSWORD" hint="required">
         <input
-          className="ops-focus"
+          className={inputCls}
           type="password"
           value={form.password}
           onChange={handleChange("password")}
           placeholder="••••••••••"
           required
-          style={inputSx}
         />
       </Field>
 
-      {showSelector && (
+      {allowedRoles.length > 1 && (
         <Field label="ROLE" hint="required">
           <select
-            className="ops-focus"
+            className={`${inputCls} cursor-pointer`}
             value={form.role}
             onChange={handleChange("role")}
-            style={{ ...inputSx, cursor: "pointer" }}
           >
             {allowedRoles.map(r => (
               <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
@@ -141,7 +117,7 @@ export default function CreateUserForm({ allowedRoles = ["ppc"], onSuccess }) {
         </Field>
       )}
 
-      <div style={{ borderTop: `1px solid ${T.subtle}`, paddingTop: 20, marginTop: 6 }}>
+      <div className="border-t border-[#2e2c22] pt-5 mt-1.5">
         <GoldBtn type="submit" disabled={loading} style={{ width: "100%", padding: "13px" }}>
           {loading ? "CREATING…" : "CREATE USER"}
         </GoldBtn>

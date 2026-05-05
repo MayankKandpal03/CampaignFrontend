@@ -1,51 +1,23 @@
 /**
  * UserCard — displays a single user's info with optional delete button.
- *
- * Used in:
- *  - ManagerDashboard → Team Members section (shows campaign count)
- *  - PMDashboard      → PPC Users section (shows managerId / teams)
- *
- * Previously each dashboard had its own card markup. Unified with optional
- * `campaignCount` and `showDetails` props.
- *
- * @prop {object}   user           - { _id, username, email, role, managerId?, teams? }
- * @prop {number=}  campaignCount  - if provided, shown as a stat on the card
- * @prop {boolean=} showDetails    - show managerId / teams rows (PM view)
- * @prop {Function} onDelete       - called with the user object when REMOVE is clicked
  */
-import { T } from "../../constants/theme.js";
 import { initials } from "../../utils/formatters.js";
 import RoleBadge from "../common/RoleBadge.jsx";
 
 export default function UserCard({ user, campaignCount, showDetails = false, onDelete }) {
   return (
-    <div
-      style={{
-        background: T.bgCard, border: `1px solid ${T.goldBorder}`,
-        borderRadius: 4, padding: "16px 18px",
-        transition: "border-color .2s, box-shadow .2s",
-        animation: "opsFadeUp .22s ease",
-      }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `${T.gold}44`; e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,.4)"; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = T.goldBorder;  e.currentTarget.style.boxShadow = "none"; }}
-    >
-      {/* Top row: avatar + name + delete button */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: "50%",
-            background: T.purpleBg, border: `1px solid ${T.purple}44`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 12, fontWeight: 700, color: T.purple,
-            fontFamily: "'Cinzel', serif", flexShrink: 0,
-          }}>
+    <div className="bg-[#141310] border border-[rgba(201,164,42,0.20)] rounded p-[16px_18px] transition-all duration-200 hover:border-[rgba(201,164,42,0.27)] hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-[opsFadeUp_0.22s_ease]">
+      {/* Top row */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-full bg-[rgba(167,139,250,0.11)] border border-[rgba(167,139,250,0.27)] flex items-center justify-center text-xs font-bold text-[#a78bfa] font-['Cinzel',serif] shrink-0">
             {initials(user.username || "U")}
           </div>
           <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: T.white, fontFamily: "'Cinzel', serif" }}>
+            <p className="m-0 text-[13px] font-semibold text-[#f5edd8] font-['Cinzel',serif]">
               {user.username || "—"}
             </p>
-            <p style={{ margin: "2px 0 0", fontSize: 10, color: T.muted, fontFamily: "'JetBrains Mono', monospace" }}>
+            <p className="mt-0.5 m-0 text-[10px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
               {user.email || "—"}
             </p>
           </div>
@@ -53,44 +25,34 @@ export default function UserCard({ user, campaignCount, showDetails = false, onD
 
         {onDelete && (
           <button
-            className="ops-del"
+            className="ops-del px-2.5 py-1 rounded bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.2)] text-[#7a7060] text-[9px] font-bold tracking-widest cursor-pointer font-['Cinzel',serif]"
             onClick={() => onDelete(user)}
-            style={{
-              padding: "4px 10px", borderRadius: 2,
-              background: T.redBg, border: `1px solid ${T.red}33`,
-              color: T.muted, fontSize: 9, fontWeight: 700,
-              letterSpacing: "0.1em", cursor: "pointer",
-              fontFamily: "'Cinzel', serif",
-            }}
           >
             REMOVE
           </button>
         )}
       </div>
 
-      {/* Stat rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {/* Role */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>ROLE</span>
+      {/* Stats */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] text-[#7a7060] tracking-[0.12em] font-['Cinzel',serif]">ROLE</span>
           <RoleBadge role={user.role} />
         </div>
 
-        {/* Campaign count (Manager view) */}
         {campaignCount !== undefined && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>TASKS</span>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: campaignCount > 0 ? T.gold : T.subtle, fontFamily: "'Cinzel', serif" }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-[#7a7060] tracking-[0.12em] font-['Cinzel',serif]">TASKS</span>
+            <p className={`m-0 text-[13px] font-bold font-['Cinzel',serif] ${campaignCount > 0 ? "text-[#c9a42a]" : "text-[#2e2c22]"}`}>
               {campaignCount}
             </p>
           </div>
         )}
 
-        {/* PM detail rows */}
         {showDetails && user.managerId && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>MANAGER</span>
-            <span style={{ fontSize: 10, color: T.muted, fontFamily: "'JetBrains Mono', monospace", maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-[#7a7060] tracking-[0.12em] font-['Cinzel',serif]">MANAGER</span>
+            <span className="text-[10px] text-[#7a7060] font-['JetBrains_Mono',monospace] max-w-37.5 overflow-hidden text-ellipsis">
               {typeof user.managerId === "object"
                 ? (user.managerId.username || user.managerId._id)
                 : user.managerId}
@@ -99,19 +61,18 @@ export default function UserCard({ user, campaignCount, showDetails = false, onD
         )}
 
         {showDetails && user.teams?.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>TEAMS</span>
-            <span style={{ fontSize: 10, color: T.purple, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-[#7a7060] tracking-[0.12em] font-['Cinzel',serif]">TEAMS</span>
+            <span className="text-[10px] text-[#a78bfa] font-['JetBrains_Mono',monospace]">
               {user.teams.length} team{user.teams.length > 1 ? "s" : ""}
             </span>
           </div>
         )}
 
-        {/* User ID (PM view) */}
         {showDetails && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: T.muted, letterSpacing: "0.12em", fontFamily: "'Cinzel', serif" }}>USER ID</span>
-            <span style={{ fontSize: 9, color: T.subtle, fontFamily: "'JetBrains Mono', monospace" }}>
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-[#7a7060] tracking-[0.12em] font-['Cinzel',serif]">USER ID</span>
+            <span className="text-[9px] text-[#2e2c22] font-['JetBrains_Mono',monospace]">
               {String(user._id || "—").slice(0, 16)}…
             </span>
           </div>

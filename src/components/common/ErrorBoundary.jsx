@@ -1,136 +1,65 @@
-/**
- * ErrorBoundary — catches render-phase errors in any child tree.
- *
- * ADDED (was completely absent from the original codebase).
- * Without this, any unhandled render error in a dashboard crashes the entire app
- * with a blank white screen and no user-visible feedback.
- *
- * Usage:
- *   <ErrorBoundary>
- *     <PPCDashboard />
- *   </ErrorBoundary>
- *
- * Or wrap each route individually in App.jsx for per-page isolation.
- *
- * @prop {ReactNode} children
- * @prop {ReactNode=} fallback  - custom fallback UI; defaults to styled error card
- */
-import { Component } from "react";
-import { T } from "../constants/theme.js";
+// src/components/common/ITNotifPanel.jsx
+// White-themed notification panel for the IT dashboard — Tailwind refactor.
+import { useEffect } from 'react';
+import useNotifStore from '../../stores/useNotificationStore.js';
+import { fmt } from '../../utils/formatters.js';
 
-export default class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+export default function ITNotifPanel({ open, width = 310 }) {
+  const { notifications, markRead, clearNotifs } = useNotifStore();
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
+  useEffect(() => {
+    if (open) markRead();
+  }, [open, markRead]);
 
-  componentDidCatch(error, info) {
-    // Replace with your error reporting service (Sentry, Datadog, etc.)
-    console.error("[ErrorBoundary]", error, info.componentStack);
-  }
+  if (!open) return null;
 
-  render() {
-    if (!this.state.hasError) return this.props.children;
+  return (
+    <div
+      className="absolute top-11.5 right-0 z-600 bg-white border border-[#e8e5de] rounded-xl overflow-hidden shadow-[0_8px_32px_rgba(24,23,15,0.12),0_2px_8px_rgba(24,23,15,0.06)]"
+      style={{ width, animation: 'slideUp 0.22s cubic-bezier(.22,1,.36,1) both' }}
+    >
+      <style>{`@keyframes slideUp { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }`}</style>
 
-    if (this.props.fallback) return this.props.fallback;
-
-    return (
-      <div style={{
-        minHeight:      "100vh",
-        background:     T.bg,
-        display:        "flex",
-        alignItems:     "center",
-        justifyContent: "center",
-        padding:        24,
-        fontFamily:     "'DM Sans', sans-serif",
-      }}>
-        <div style={{
-          background:   T.bgCard,
-          border:       `1px solid ${T.red}44`,
-          borderRadius: 8,
-          padding:      "32px 36px",
-          maxWidth:     480,
-          width:        "100%",
-          textAlign:    "center",
-        }}>
-          {/* Icon */}
-          <div style={{ fontSize: 32, marginBottom: 16 }}>⚠</div>
-
-          <h2 style={{
-            margin:        "0 0 8px",
-            fontSize:      18,
-            fontWeight:    600,
-            color:         T.white,
-            fontFamily:    "'Cinzel', serif",
-            letterSpacing: "0.04em",
-          }}>
-            Something went wrong
-          </h2>
-
-          <p style={{
-            margin:     "0 0 24px",
-            fontSize:   13,
-            color:      T.muted,
-            lineHeight: 1.6,
-          }}>
-            An unexpected error occurred. Please refresh the page.
-            If the problem persists, contact IT support.
-          </p>
-
-          {/* Error detail (collapsed) */}
-          {this.state.error && (
-            <details style={{ textAlign: "left", marginBottom: 20 }}>
-              <summary style={{
-                fontSize:  11,
-                color:     T.muted,
-                cursor:    "pointer",
-                fontFamily:"'JetBrains Mono', monospace",
-              }}>
-                Error detail
-              </summary>
-              <pre style={{
-                marginTop:    8,
-                padding:      "10px 12px",
-                background:   T.bgInput,
-                borderRadius: 4,
-                fontSize:     10,
-                color:        T.red,
-                overflowX:    "auto",
-                fontFamily:   "'JetBrains Mono', monospace",
-                whiteSpace:   "pre-wrap",
-                wordBreak:    "break-all",
-              }}>
-                {this.state.error.message}
-              </pre>
-            </details>
-          )}
-
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-[#e8e5de] flex justify-between items-center bg-[#f8f7f4]">
+        <span className="text-[10px] font-semibold tracking-[0.14em] text-[#2a6048] font-['DM_Mono',monospace] uppercase">
+          Notifications
+        </span>
+        {notifications.length > 0 && (
           <button
-            onClick={() => window.location.reload()}
-            style={{
-              padding:       "10px 24px",
-              borderRadius:  4,
-              cursor:        "pointer",
-              background:    T.gold,
-              border:        `1px solid ${T.gold}`,
-              color:         "#0c0b08",
-              fontSize:      11,
-              fontWeight:    700,
-              letterSpacing: "0.12em",
-              fontFamily:    "'Cinzel', serif",
-              transition:    "background 0.15s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = T.goldLight}
-            onMouseLeave={e => e.currentTarget.style.background = T.gold}
+            onClick={clearNotifs}
+            className="bg-none border-none text-[#8a8475] text-[11px] cursor-pointer px-1.5 py-0.5 rounded font-['DM_Sans',sans-serif] transition-colors duration-150 hover:text-[#b83030]"
           >
-            REFRESH PAGE
+            Clear all
           </button>
-        </div>
+        )}
       </div>
-    );
-  }
+
+      {/* List */}
+      <div className="max-h-80 overflow-y-auto">
+        {notifications.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <p className="m-0 mt-2 text-[12px] text-[#8a8475] font-['DM_Sans',sans-serif]">
+              No notifications
+            </p>
+          </div>
+        ) : (
+          notifications.map((n, i) => (
+            <div
+              key={n.id}
+              className="px-4 py-2.75 cursor-default transition-colors duration-150 hover:bg-[#f8f7f4]"
+              style={{ borderBottom: i < notifications.length - 1 ? '1px solid #e8e5de' : 'none' }}
+            >
+              <p className="m-0 text-[12px] text-[#18170f] leading-normal font-['DM_Sans',sans-serif]">
+                {n.message}
+              </p>
+              <p className="m-0 mt-1 text-[9px] text-[#8a8475] font-['DM_Mono',monospace]">
+                {fmt(n.time)}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }

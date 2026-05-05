@@ -1,8 +1,6 @@
 /**
  * DiamondLogo — premium brand SVG mark.
- * Props unchanged.
  */
-import { T } from "../../constants/theme.js";
 
 export default function DiamondLogo({ size = 34 }) {
   return (
@@ -16,20 +14,20 @@ export default function DiamondLogo({ size = 34 }) {
       <polygon
         points="18,3 33,18 18,33 3,18"
         fill="none"
-        stroke={T.gold}
+        stroke="#c9a42a"
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
       <polygon
         points="18,9 28,18 18,27 8,18"
-        fill={T.goldDim}
-        stroke={T.goldBorder}
+        fill="rgba(201,164,42,0.13)"
+        stroke="rgba(201,164,42,0.20)"
         strokeWidth="0.8"
         strokeLinejoin="round"
       />
       <polygon
         points="18,14 22,18 18,22 14,18"
-        fill={T.gold}
+        fill="#c9a42a"
         opacity="0.9"
       />
     </svg>
