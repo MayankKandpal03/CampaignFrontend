@@ -38,23 +38,17 @@ function NotifPermissionBanner({ permission, onRequest }) {
   if (permission === "granted" || permission === "unsupported") return null;
   const isDenied = permission === "denied";
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      gap: 12, padding: "10px 28px",
-      background:   isDenied ? "var(--danger-lt)" : "var(--warn-lt)",
-      borderBottom: `1px solid ${isDenied ? "rgba(184,48,48,0.2)" : "rgba(143,66,12,0.2)"}`,
-      flexWrap: "wrap",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-        <span style={{ fontSize: 16 }}>{isDenied ? "🔕" : "🔔"}</span>
+    <div className={`flex items-center justify-between gap-3 px-7 py-2.5 flex-wrap ${isDenied ? "bg-[var(--danger-lt)] border-b border-[rgba(184,48,48,0.2)]" : "bg-[var(--warn-lt)] border-b border-[rgba(143,66,12,0.2)]"}`}>
+      <div className="flex items-center gap-2.25">
+        <span className="text-base">{isDenied ? "🔕" : "🔔"}</span>
         <div>
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: isDenied ? "var(--danger)" : "var(--warn)", fontFamily: "var(--ff-body)" }}>
+          <p className={`m-0 text-xs font-medium font-[var(--ff-body)] ${isDenied ? "text-[var(--danger)]" : "text-[var(--warn)]"}`}>
             {isDenied
               ? "Desktop notifications are blocked — you won't be alerted on other tabs."
               : "Enable desktop notifications to receive alerts when you're on other tabs or apps."}
           </p>
           {isDenied && (
-            <p style={{ margin: "2px 0 0", fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>
+            <p className="m-0 mt-0.5 text-[11px] text-[var(--muted)] font-[var(--ff-mono)]">
               To re-enable: click the 🔒 lock icon in your browser address bar → Notifications → Allow
             </p>
           )}
@@ -63,9 +57,7 @@ function NotifPermissionBanner({ permission, onRequest }) {
       {!isDenied && (
         <button
           onClick={onRequest}
-          style={{ padding: "7px 16px", borderRadius: "var(--radius-sm)", border: "1.5px solid var(--warn)", background: "var(--warn-lt)", color: "var(--warn)", fontFamily: "var(--ff-body)", fontSize: 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s ease", flexShrink: 0 }}
-          onMouseEnter={e => { e.currentTarget.style.background = "var(--warn)"; e.currentTarget.style.color = "#fff"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "var(--warn-lt)"; e.currentTarget.style.color = "var(--warn)"; }}>
+          className="px-4 py-[7px] rounded-[var(--radius-sm)] border-[1.5px] border-[var(--warn)] bg-[var(--warn-lt)] text-[var(--warn)] font-[var(--ff-body)] text-xs font-semibold cursor-pointer whitespace-nowrap transition-all duration-150 shrink-0 hover:bg-[var(--warn)] hover:text-white">
           Enable Notifications
         </button>
       )}
@@ -91,7 +83,7 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
         <div className="modal-body">
           <div className="field-group">
             <label className="field-label">Scheduled Time</label>
-            <p style={{ margin: 0, fontFamily: "var(--ff-mono)", fontSize: 13, color: "var(--accent)" }}>{task.time}</p>
+            <p className="m-0 font-[var(--ff-mono)] text-[13px] text-[var(--accent)]">{task.time}</p>
           </div>
           <div className="field-group">
             <label className="field-label">Your Message (optional)</label>
@@ -102,7 +94,7 @@ function TaskAckModal({ task, onClose, onConfirm, loading }) {
               rows={3}
             />
           </div>
-          <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>
+          <p className="m-0 text-[11px] text-[var(--muted)] font-[var(--ff-mono)]">
             ℹ "Done at [time]" will be appended automatically.
           </p>
         </div>
@@ -123,62 +115,65 @@ function OverlayNotif({ notif, queueLength, onAck, onClose }) {
   const accentColor = isCampaign ? "var(--accent)" : "var(--info)";
   const accentBg    = isCampaign ? "var(--accent-lt)" : "var(--info-lt)";
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(18,17,12,0.85)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, animation: "itOverlayIn 0.3s cubic-bezier(.22,1,.36,1) both" }}>
+    <div className="fixed inset-0 z-[99999] bg-[rgba(18,17,12,0.85)] backdrop-blur-lg flex items-center justify-center p-6 animate-[itOverlayIn_0.3s_cubic-bezier(.22,1,.36,1)_both]">
       <style>{`
         @keyframes itOverlayIn { from{opacity:0}to{opacity:1} }
         @keyframes itCardIn    { from{opacity:0;transform:translateY(24px) scale(.96)}to{opacity:1;transform:none} }
         @keyframes itPulseRing { 0%{transform:scale(1);opacity:.9}70%{transform:scale(1.7);opacity:0}100%{transform:scale(1.7);opacity:0} }
         @keyframes itBounceIn  { 0%{transform:scale(.3)}50%{transform:scale(1.07)}70%{transform:scale(.96)}100%{transform:scale(1)} }
       `}</style>
-      <div style={{ width: "100%", maxWidth: 500, background: "var(--surface)", border: `1px solid ${isCampaign ? "rgba(42,96,72,0.4)" : "rgba(26,79,110,0.4)"}`, borderRadius: 20, overflow: "hidden", boxShadow: "0 32px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05)", animation: "itCardIn .35s cubic-bezier(.22,1,.36,1) both" }}>
-        <div style={{ height: 4, background: isCampaign ? "linear-gradient(90deg,var(--accent),#3a7a5a)" : "linear-gradient(90deg,var(--info),#2a6a8e)" }} />
-        <div style={{ padding: "24px 28px 18px", background: "var(--surface2)", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "flex-start", gap: 16 }}>
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: accentBg, animation: "itPulseRing 1.6s ease-out infinite" }} />
-            <div style={{ width: 46, height: 46, borderRadius: "50%", background: accentBg, border: `2px solid ${accentColor}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, position: "relative", animation: "itBounceIn .5s cubic-bezier(.22,1,.36,1) .1s both" }}>
+      <div
+        className="w-full max-w-[500px] bg-[var(--surface)] rounded-[20px] overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,.6),0_0_0_1px_rgba(255,255,255,.05)] animate-[itCardIn_.35s_cubic-bezier(.22,1,.36,1)_both]"
+        style={{ border: `1px solid ${isCampaign ? "rgba(42,96,72,0.4)" : "rgba(26,79,110,0.4)"}` }}
+      >
+        <div className="h-1" style={{ background: isCampaign ? "linear-gradient(90deg,var(--accent),#3a7a5a)" : "linear-gradient(90deg,var(--info),#2a6a8e)" }} />
+        <div className="px-7 pt-6 pb-4.5 bg-[var(--surface2)] border-b border-[var(--border)] flex items-start gap-4">
+          <div className="relative shrink-0">
+            <div className="absolute inset-0 rounded-full animate-[itPulseRing_1.6s_ease-out_infinite]" style={{ background: accentBg }} />
+            <div
+              className="w-[46px] h-[46px] rounded-full flex items-center justify-center text-[22px] relative animate-[itBounceIn_.5s_cubic-bezier(.22,1,.36,1)_.1s_both]"
+              style={{ background: accentBg, border: `2px solid ${accentColor}` }}
+            >
               {isCampaign ? "📋" : "🗓"}
             </div>
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ margin: "0 0 4px", fontSize: 10, fontFamily: "var(--ff-mono)", letterSpacing: "0.1em", textTransform: "uppercase", color: accentColor, fontWeight: 600 }}>
+          <div className="flex-1 min-w-0">
+            <p className="m-0 mb-1 text-[10px] font-[var(--ff-mono)] tracking-[0.1em] uppercase font-semibold" style={{ color: accentColor }}>
               {isCampaign ? "🔴 New Task Assigned" : "⏰ Daily Task Due Now"}
             </p>
-            <h2 style={{ margin: "0 0 3px", fontSize: 19, fontWeight: 700, color: "var(--text)", fontFamily: "var(--ff-display)", letterSpacing: "-0.02em", lineHeight: 1.2 }}>{notif.title}</h2>
-            <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>
+            <h2 className="m-0 mb-0.75 text-[19px] font-bold text-[var(--text)] font-[var(--ff-display)] tracking-[-0.02em] leading-[1.2]">{notif.title}</h2>
+            <p className="m-0 text-[11px] text-[var(--muted)] font-[var(--ff-mono)]">
               Received {new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
-              {queueLength > 1 && <span style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 99, background: "var(--danger-lt)", color: "var(--danger)", border: "1px solid rgba(184,48,48,.2)", fontSize: 10 }}>+{queueLength - 1} more waiting</span>}
+              {queueLength > 1 && <span className="ml-2 px-2 py-px rounded-full bg-[var(--danger-lt)] text-[var(--danger)] border border-[rgba(184,48,48,.2)] text-[10px]">+{queueLength - 1} more waiting</span>}
             </p>
           </div>
         </div>
-        <div style={{ padding: "20px 28px" }}>
-          <div style={{ padding: "13px 16px", background: "var(--surface3)", border: "1px solid var(--border)", borderRadius: 10, marginBottom: 14 }}>
-            <p style={{ margin: "0 0 6px", fontSize: 8, fontFamily: "var(--ff-mono)", letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)" }}>{isCampaign ? "PM Note / Message" : "Task Description"}</p>
-            <p style={{ margin: 0, fontSize: 14, color: "var(--ink)", lineHeight: 1.65, wordBreak: "break-word", fontFamily: "var(--ff-body)" }}>{notif.body || "—"}</p>
+        <div className="px-7 py-5">
+          <div className="p-[13px_16px] bg-[var(--surface3)] border border-[var(--border)] rounded-[10px] mb-3.5">
+            <p className="m-0 mb-1.5 text-[8px] font-[var(--ff-mono)] tracking-[0.1em] uppercase text-[var(--muted)]">{isCampaign ? "PM Note / Message" : "Task Description"}</p>
+            <p className="m-0 text-sm text-[var(--ink)] leading-[1.65] break-words font-[var(--ff-body)]">{notif.body || "—"}</p>
           </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "10px 14px", background: "rgba(143,66,12,.07)", border: "1px solid rgba(143,66,12,.18)", borderRadius: 8, marginBottom: 20 }}>
-            <span style={{ fontSize: 14, flexShrink: 0, marginTop: 1 }}>⚠️</span>
-            <p style={{ margin: 0, fontSize: 12, color: "var(--warn)", lineHeight: 1.55, fontFamily: "var(--ff-body)" }}>This notification requires your attention. Acknowledge to confirm, or dismiss to handle it later.</p>
+          <div className="flex items-start gap-2.25 p-[10px_14px] bg-[rgba(143,66,12,.07)] border border-[rgba(143,66,12,.18)] rounded-lg mb-5">
+            <span className="text-sm shrink-0 mt-px">⚠️</span>
+            <p className="m-0 text-xs text-[var(--warn)] leading-[1.55] font-[var(--ff-body)]">This notification requires your attention. Acknowledge to confirm, or dismiss to handle it later.</p>
           </div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="flex gap-2.5">
             <button
               onClick={onClose}
-              style={{ flex: 1, padding: "12px", borderRadius: 10, border: "1.5px solid var(--border2)", background: "none", fontFamily: "var(--ff-body)", fontSize: 13, fontWeight: 500, color: "var(--muted)", cursor: "pointer", transition: "all .15s ease" }}
-              onMouseEnter={e => { e.currentTarget.style.color = "var(--ink)"; e.currentTarget.style.background = "var(--surface2)"; }}
-              onMouseLeave={e => { e.currentTarget.style.color = "var(--muted)"; e.currentTarget.style.background = "none"; }}>
+              className="flex-1 p-3 rounded-[10px] border-[1.5px] border-[var(--border2)] bg-transparent font-[var(--ff-body)] text-[13px] font-medium text-[var(--muted)] cursor-pointer transition-all duration-150 hover:text-[var(--ink)] hover:bg-[var(--surface2)]">
               Dismiss (handle later)
             </button>
             <button
               onClick={() => onAck(notif)}
-              style={{ flex: 2, padding: "12px", borderRadius: 10, border: "1.5px solid transparent", background: isCampaign ? "linear-gradient(135deg,var(--accent),#3a7a5a)" : "linear-gradient(135deg,var(--info),#2a6a8e)", fontFamily: "var(--ff-body)", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all .15s ease", boxShadow: "0 4px 16px rgba(0,0,0,.15)" }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = ".9"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "none"; }}>
-              <span style={{ fontSize: 16 }}>✓</span> Acknowledge Now
+              className="flex-[2] p-3 rounded-[10px] border-[1.5px] border-transparent text-white font-[var(--ff-body)] text-sm font-semibold cursor-pointer flex items-center justify-center gap-2 transition-all duration-150 shadow-[0_4px_16px_rgba(0,0,0,.15)] hover:opacity-90 hover:-translate-y-px"
+              style={{ background: isCampaign ? "linear-gradient(135deg,var(--accent),#3a7a5a)" : "linear-gradient(135deg,var(--info),#2a6a8e)" }}>
+              <span className="text-base">✓</span> Acknowledge Now
             </button>
           </div>
         </div>
-        <div style={{ padding: "10px 28px", background: "var(--surface2)", borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: accentColor, animation: "itPulseRing 1.6s ease-out infinite", flexShrink: 0 }} />
-          <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>IT Portal · Campaign Management System</p>
+        <div className="px-7 py-2.5 bg-[var(--surface2)] border-t border-[var(--border)] flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-[itPulseRing_1.6s_ease-out_infinite]" style={{ background: accentColor }} />
+          <p className="m-0 text-[11px] text-[var(--muted)] font-[var(--ff-mono)]">IT Portal · Campaign Management System</p>
         </div>
       </div>
     </div>
@@ -190,7 +185,7 @@ function HistoryTable({ records, loading }) {
   if (loading) {
     return (
       <div className="table-empty">
-        <div className="table-empty-icon" style={{ fontSize: 28 }}>⏳</div>
+        <div className="table-empty-icon text-[28px]">⏳</div>
         <div className="table-empty-text">Loading history…</div>
       </div>
     );
@@ -205,11 +200,11 @@ function HistoryTable({ records, loading }) {
   }
   return (
     <table>
-      <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface2)" }}>
+      <thead className="sticky top-0 z-[1] bg-[var(--surface2)]">
         <tr>
-          <th style={{ width: "38%" }}>PM Note</th>
-          <th style={{ width: "18%", whiteSpace: "nowrap" }}>Schedule Time</th>
-          <th style={{ width: "44%" }}>IT Note</th>
+          <th className="w-[38%]">PM Note</th>
+          <th className="w-[18%] whitespace-nowrap">Schedule Time</th>
+          <th className="w-[44%]">IT Note</th>
         </tr>
       </thead>
       <tbody>
@@ -218,18 +213,21 @@ function HistoryTable({ records, loading }) {
           const noteColor = isDone ? "var(--accent)" : "var(--warn)";
           return (
             <tr key={c._id}>
-              <td style={{ padding: "16px 18px", maxWidth: 0, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.65, verticalAlign: "top" }}>
+              <td className="p-[16px_18px] max-w-0 break-words whitespace-pre-wrap leading-[1.65] align-top">
                 {c.pmMessage
-                  ? <span style={{ fontSize: 13, color: "var(--ink)", fontFamily: "var(--ff-body)" }}>{c.pmMessage}</span>
-                  : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>No PM note</span>}
+                  ? <span className="text-[13px] text-[var(--ink)] font-[var(--ff-body)]">{c.pmMessage}</span>
+                  : <span className="text-xs text-[var(--muted)] italic">No PM note</span>}
               </td>
-              <td className="time-cell" style={{ padding: "16px 18px", verticalAlign: "top", whiteSpace: "nowrap" }}>
+              <td className="time-cell p-[16px_18px] align-top whitespace-nowrap">
                 {c.scheduleAt ? fmt(c.scheduleAt) : "—"}
               </td>
-              <td style={{ padding: "16px 18px", maxWidth: 0, verticalAlign: "top", borderLeft: `3px solid ${noteColor}`, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.65 }}>
+              <td
+                className="p-[16px_18px] max-w-0 align-top break-words whitespace-pre-wrap leading-[1.65]"
+                style={{ borderLeft: `3px solid ${noteColor}` }}
+              >
                 {c.itMessage
-                  ? <span style={{ fontSize: 13, color: "var(--ink)", fontFamily: "var(--ff-body)" }}>{c.itMessage}</span>
-                  : <span style={{ fontSize: 12, color: "var(--muted)", fontStyle: "italic" }}>No IT note</span>}
+                  ? <span className="text-[13px] text-[var(--ink)] font-[var(--ff-body)]">{c.itMessage}</span>
+                  : <span className="text-xs text-[var(--muted)] italic">No IT note</span>}
               </td>
             </tr>
           );
@@ -548,13 +546,13 @@ export default function ITDashboard() {
   ];
 
   return (
-    <div className="it-root" style={{ height: "100vh", overflow: "hidden" }}>
+    <div className="it-root h-screen overflow-hidden">
       <div className={`sidebar-overlay ${sidebarOpen ? "show" : ""}`} onClick={() => setSidebarOpen(false)} />
 
       {/* ── Sidebar ── */}
       <aside className={`it-sidebar ${sidebarOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="sidebar-brand-name">Task<i style={{ fontStyle: "normal", opacity: .4 }}>.</i></div>
+          <div className="sidebar-brand-name">Task<i className="not-italic opacity-40">.</i></div>
           <div className="sidebar-brand-sub">IT Portal</div>
         </div>
         <div className="sidebar-user">
@@ -572,9 +570,9 @@ export default function ITDashboard() {
               onClick={() => { setActiveSection(item.id); setSidebarOpen(false); }}
             >
               <span className="nav-icon">{item.icon}</span>
-              <span style={{ flex: 1 }}>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
               {item.count > 0 && (
-                <span style={{ padding: "1px 7px", borderRadius: 99, background: activeSection === item.id ? "var(--accent)" : "var(--surface3)", color: activeSection === item.id ? "#fff" : "var(--muted)", fontSize: 10, fontFamily: "var(--ff-mono)", fontWeight: 700 }}>
+                <span className={`px-[7px] py-px rounded-full text-[10px] font-[var(--ff-mono)] font-bold ${activeSection === item.id ? "bg-[var(--accent)] text-white" : "bg-[var(--surface3)] text-[var(--muted)]"}`}>
                   {item.count}
                 </span>
               )}
@@ -587,7 +585,7 @@ export default function ITDashboard() {
       </aside>
 
       {/* ── Main ── */}
-      <div className="it-main" style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div className="it-main flex flex-col overflow-hidden">
         <NotifPermissionBanner permission={notifPermission} onRequest={handleRequestPermission} />
 
         {/* ── Header ── */}
@@ -607,25 +605,23 @@ export default function ITDashboard() {
           </span>
 
           {/* Notification Bell */}
-          <div style={{ position: "relative" }} ref={notifBellRef}>
+          <div className="relative" ref={notifBellRef}>
             <button
               onClick={() => { setShowNotifs(v => !v); if (!showNotifs) markRead(); }}
               title={`${unread} unread notifications`}
-              style={{ width: 46, height: 36, borderRadius: "var(--radius-sm)", border: showNotifs ? "1.5px solid var(--accent)" : "1px solid var(--border)", background: showNotifs ? "var(--accent-lt)" : "var(--surface)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all .18s ease", position: "relative", flexShrink: 0, boxShadow: showNotifs ? "0 2px 8px rgba(42,96,72,.15)" : "var(--shadow-sm)" }}
-              onMouseEnter={e => { if (!showNotifs) { e.currentTarget.style.borderColor = "var(--border2)"; e.currentTarget.style.background = "var(--surface2)"; } }}
-              onMouseLeave={e => { if (!showNotifs) { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--surface)"; } }}
+              className={`notif-bell w-[46px] h-9 ${showNotifs ? "border-[1.5px] border-[var(--accent)] bg-[var(--accent-lt)] shadow-[0_2px_8px_rgba(42,96,72,.15)]" : "border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-sm)] hover:border-[var(--border2)] hover:bg-[var(--surface2)]"}`}
               aria-label="Notifications"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={showNotifs ? "var(--accent)" : "var(--muted)"} strokeWidth="2">
                 <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 01-3.46 0" />
               </svg>
               {unread > 0 && (
-                <span style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 99, background: "var(--danger)", color: "#fff", fontSize: 9, fontFamily: "var(--ff-mono)", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px", border: "2px solid var(--bg)" }}>
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-[var(--danger)] text-white text-[9px] font-[var(--ff-mono)] font-bold flex items-center justify-center px-[3px] border-2 border-[var(--bg)]">
                   {unread > 99 ? "99+" : unread}
                 </span>
               )}
               {overlayQueue.length > 0 && unread === 0 && (
-                <span style={{ position: "absolute", top: -4, right: -4, width: 10, height: 10, borderRadius: "50%", background: "var(--warn)", border: "2px solid var(--bg)" }} />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--warn)] border-2 border-[var(--bg)]" />
               )}
             </button>
             <ITNotifPanel open={showNotifs} onClose={() => setShowNotifs(false)} width={310} />
@@ -634,14 +630,14 @@ export default function ITDashboard() {
 
         {/* ══════ CAMPAIGNS ══════ */}
         {activeSection === "tasks" && (
-          <div className="it-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div className="section-head" style={{ flexShrink: 0 }}>
+          <div className="it-content flex-1 flex flex-col overflow-hidden">
+            <div className="section-head shrink-0">
               <span className="section-title">Request Queue</span>
               <button className="refresh-btn" onClick={handleRefresh} disabled={refreshing}>
                 {refreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
-            <div className="table-wrap" style={{ flex: 1, overflow: "auto" }}>
+            <div className="table-wrap flex-1 overflow-auto">
               {itCampaigns.length === 0 ? (
                 <div className="table-empty">
                   <div className="table-empty-icon">✅</div>
@@ -649,17 +645,17 @@ export default function ITDashboard() {
                 </div>
               ) : (
                 <table>
-                  <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface2)" }}>
+                  <thead className="sticky top-0 z-[1] bg-[var(--surface2)]">
                     <tr><th>PM Note</th><th>Scheduled At</th><th>Status</th><th>Action</th><th>Acknowledge</th></tr>
                   </thead>
                   <tbody>
                     {itCampaigns.map(c => (
                       <tr key={c._id}>
-                        <td style={{ maxWidth: 320, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.6, padding: "16px 18px" }}>{c.pmMessage || "—"}</td>
-                        <td className="time-cell" style={{ padding: "16px 18px" }}>{fmt(c.scheduleAt)}</td>
-                        <td style={{ padding: "16px 18px" }}><StatusBadge value={c.status} /></td>
-                        <td style={{ padding: "16px 18px" }}><StatusBadge value={c.action} /></td>
-                        <td style={{ padding: "16px 18px" }}>
+                        <td className="max-w-[320px] break-words whitespace-pre-wrap leading-[1.6] p-[16px_18px]">{c.pmMessage || "—"}</td>
+                        <td className="time-cell p-[16px_18px]">{fmt(c.scheduleAt)}</td>
+                        <td className="p-[16px_18px]"><StatusBadge value={c.status} /></td>
+                        <td className="p-[16px_18px]"><StatusBadge value={c.action} /></td>
+                        <td className="p-[16px_18px]">
                           <button className="ack-btn" onClick={() => setAckTarget(c)}>✓ Acknowledge</button>
                         </td>
                       </tr>
@@ -673,17 +669,17 @@ export default function ITDashboard() {
 
         {/* ══════ SCHEDULE TASKS ══════ */}
         {activeSection === "schedule-tasks" && (
-          <div className="it-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div className="section-head" style={{ flexShrink: 0 }}>
+          <div className="it-content flex-1 flex flex-col overflow-hidden">
+            <div className="section-head shrink-0">
               <span className="section-title">Today's Task Queue</span>
               <button className="refresh-btn" onClick={fetchDueTasks} disabled={taskFetching}>
                 {taskFetching ? "⟳ Loading…" : "⟳ Refresh"}
               </button>
             </div>
-            <div className="table-wrap" style={{ flex: 1, overflow: "auto" }}>
+            <div className="table-wrap flex-1 overflow-auto">
               {taskFetching ? (
                 <div className="table-empty">
-                  <div className="table-empty-icon" style={{ fontSize: 28 }}>⏳</div>
+                  <div className="table-empty-icon text-[28px]">⏳</div>
                   <div className="table-empty-text">Loading tasks…</div>
                 </div>
               ) : dailyTasks.length === 0 ? (
@@ -693,7 +689,7 @@ export default function ITDashboard() {
                 </div>
               ) : (
                 <table>
-                  <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--surface2)" }}>
+                  <thead className="sticky top-0 z-[1] bg-[var(--surface2)]">
                     <tr><th>Task</th><th>Scheduled Time</th><th>Created By</th><th>Acknowledge</th></tr>
                   </thead>
                   <tbody>
@@ -701,10 +697,10 @@ export default function ITDashboard() {
                       const creatorName = typeof t.createdBy === "object" ? t.createdBy?.username : "PM";
                       return (
                         <tr key={t._id}>
-                          <td style={{ maxWidth: 400, wordBreak: "break-word", whiteSpace: "pre-wrap", lineHeight: 1.6, padding: "16px 18px" }}>{t.task}</td>
-                          <td className="time-cell" style={{ padding: "16px 18px" }}>{t.time}</td>
-                          <td style={{ padding: "16px 18px", fontSize: 13 }}>{creatorName}</td>
-                          <td style={{ padding: "16px 18px" }}>
+                          <td className="max-w-[400px] break-words whitespace-pre-wrap leading-[1.6] p-[16px_18px]">{t.task}</td>
+                          <td className="time-cell p-[16px_18px]">{t.time}</td>
+                          <td className="p-[16px_18px] text-[13px]">{creatorName}</td>
+                          <td className="p-[16px_18px]">
                             <button className="ack-btn" onClick={() => setTaskAckTarget(t)}>✓ Acknowledge</button>
                           </td>
                         </tr>
@@ -719,23 +715,23 @@ export default function ITDashboard() {
 
         {/* ══════ HISTORY ══════ */}
         {activeSection === "history" && (
-          <div className="it-content" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 16, padding: "10px 16px", background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", flexShrink: 0, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: "var(--muted)", fontFamily: "var(--ff-mono)" }}>IT NOTE border colour:</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--ff-body)", color: "var(--accent)" }}>
-                <span style={{ display: "inline-block", width: 3, height: 14, background: "var(--accent)", borderRadius: 2 }} />Done
+          <div className="it-content flex-1 flex flex-col overflow-hidden">
+            <div className="flex items-center gap-5 mb-4 px-4 py-2.5 bg-[var(--surface2)] border border-[var(--border)] rounded-[var(--radius-sm)] shrink-0 flex-wrap">
+              <span className="text-[11px] text-[var(--muted)] font-[var(--ff-mono)]">IT NOTE border colour:</span>
+              <span className="flex items-center gap-1.5 text-[11px] font-[var(--ff-body)] text-[var(--accent)]">
+                <span className="inline-block w-[3px] h-3.5 bg-[var(--accent)] rounded-sm" />Done
               </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontFamily: "var(--ff-body)", color: "var(--warn)" }}>
-                <span style={{ display: "inline-block", width: 3, height: 14, background: "var(--warn)", borderRadius: 2 }} />Not Done
+              <span className="flex items-center gap-1.5 text-[11px] font-[var(--ff-body)] text-[var(--warn)]">
+                <span className="inline-block w-[3px] h-3.5 bg-[var(--warn)] rounded-sm" />Not Done
               </span>
             </div>
-            <div className="section-head" style={{ flexShrink: 0 }}>
+            <div className="section-head shrink-0">
               <span className="section-title">Acknowledgement History</span>
               <button className="refresh-btn" onClick={() => fetchHistory(false)} disabled={historyRefreshing}>
                 {historyRefreshing ? "⟳ Refreshing…" : "⟳ Refresh"}
               </button>
             </div>
-            <div className="table-wrap" style={{ flex: 1, overflow: "auto" }}>
+            <div className="table-wrap flex-1 overflow-auto">
               <HistoryTable records={history} loading={historyLoading} />
             </div>
           </div>

@@ -247,7 +247,7 @@ export default function ManagerDashboard() {
 
         {/* ── CAMPAIGNS ── */}
         {activeSection === "tasks" && (
-          <div style={{ padding: pad }} className="flex-1 flex flex-col min-h-0">
+          <div className={`${isMobile ? "px-3.5 py-4" : "px-7 py-5.5"} flex-1 flex flex-col min-h-0`}>
             <FilterCardsGrid
               cards={FILTER_CARDS} stats={stats} activeId={statusFilter}
               onSelect={id => setStatusFilter(p => p===id ? null : id)} isMobile={isMobile}
@@ -274,7 +274,7 @@ export default function ManagerDashboard() {
                 ) : (
                   <table className="w-full border-collapse min-w-190">
                     <thead className="sticky top-0 z-1">
-                      <tr style={{ borderBottom:`1px solid ${T.subtle}`, background:`${T.bg}ee` }}>
+                      <tr className="border-b border-[#2e2c2222] bg-[#0c0b08ee] sticky-header-row">
                         {COLS.map(h => <Th key={h}>{h}</Th>)}
                       </tr>
                     </thead>
@@ -303,23 +303,16 @@ export default function ManagerDashboard() {
                         return (
                           <tr
                             key={c._id}
-                            className="ops-row"
-                            style={{ borderBottom:`1px solid ${T.subtle}22`, background: i%2===1 ? `${T.bgCard}80` : "transparent" }}
+                            className={`ops-row border-b border-[rgba(46,44,34,0.13)] ${i%2===1 ? "bg-[rgba(20,19,16,0.5)]" : "bg-transparent"}`}
                           >
                             <td className="p-[12px_16px] whitespace-nowrap">
                               <div className="flex items-center gap-1.75">
-                                <div style={{
-                                  width:24, height:24, borderRadius:"50%", flexShrink:0,
-                                  background: isOwn ? T.goldDim : T.purpleBg,
-                                  border:`1px solid ${isOwn ? T.gold : T.purple}44`,
-                                  display:"flex", alignItems:"center", justifyContent:"center",
-                                  fontSize:9, fontWeight:700,
-                                  color: isOwn ? T.gold : T.purple,
-                                  fontFamily:"'Cinzel',serif",
-                                }}>
+                                <div
+                                  className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold font-['Cinzel',serif] ${isOwn ? "bg-[rgba(201,164,42,0.13)] border border-[rgba(201,164,42,0.27)] text-[#c9a42a]" : "bg-[rgba(167,139,250,0.11)] border border-[rgba(167,139,250,0.27)] text-[#a78bfa]"}`}
+                                >
                                   {initials(creatorName || user || "M")}
                                 </div>
-                                <span style={{ fontSize:12, color: isOwn ? T.gold : T.text }}>
+                                <span className={`text-xs ${isOwn ? "text-[#c9a42a]" : "text-[#e8ddc8]"}`}>
                                   {creatorName || user || "—"}
                                 </span>
                               </div>
@@ -349,8 +342,8 @@ export default function ManagerDashboard() {
                                   Update
                                 </button>
                               ) : (
-                                <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:9, letterSpacing:"0.1em", fontWeight:700, color:ticketColor, fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>
-                                  <span style={{ width:4, height:4, borderRadius:"50%", background:ticketColor }}/>
+                              <span className={`inline-flex items-center gap-1 text-[9px] tracking-[0.1em] font-bold font-['Cinzel',serif] uppercase`} style={{ color: ticketColor }}>
+                                  <span className="w-1 h-1 rounded-full" style={{ background: ticketColor }}/>
                                   {ticketLabel}
                                 </span>
                               )}
@@ -380,11 +373,11 @@ export default function ManagerDashboard() {
 
         {/* ── CREATE ── */}
         {activeSection === "create" && (
-          <div style={{ padding: pad }} className="flex-1">
+          <div className={`${isMobile ? "px-3.5 py-4" : "px-7 py-5.5"} flex-1`}>
             <div className="max-w-140">
               {/* Team status */}
               <div className={`flex items-center gap-2.5 p-[10px_16px] mb-5 bg-[#141310] rounded-lg border ${teamId ? "border-[#2e2c22]" : "border-[#e0525244]"}`}>
-                <span style={{ width:7, height:7, borderRadius:"50%", flexShrink:0, background: teamId ? T.green : T.red, boxShadow: teamId ? `0 0 8px ${T.green}` : "none" }}/>
+                <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${teamId ? "bg-[#4cbb7f] shadow-[0_0_8px_#4cbb7f]" : "bg-[#e05252]"}`}/>
                 <div>
                   <p className="m-0 text-[9px] text-[#7a7060] tracking-[0.14em] font-['Cinzel',serif] uppercase">
                     {teamId ? "Team Resolved" : "Team Not Found"}
@@ -396,8 +389,7 @@ export default function ManagerDashboard() {
               </div>
 
               <div
-                className="bg-[#141310] border border-[#2e2c22] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.3)]"
-                style={{ padding: isMobile ? "22px 18px" : "28px 28px 24px" }}
+                className={`bg-[#141310] border border-[#2e2c22] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.3)] ${isMobile ? "p-[22px_18px]" : "p-[28px_28px_24px]"}`}
               >
                 <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(200,168,74,0.6)] font-['Cinzel',serif] uppercase">New Request</p>
                 <h2 className="m-0 mb-5.5 text-lg font-semibold text-[#f5edd8] font-['Cinzel',serif]">Create Task</h2>
@@ -446,7 +438,7 @@ export default function ManagerDashboard() {
 
         {/* ── TEAM MEMBERS ── */}
         {activeSection === "team" && (
-          <div style={{ padding: pad }} className="flex-1 overflow-y-auto">
+          <div className={`${isMobile ? "px-3.5 py-4" : "px-7 py-5.5"} flex-1 overflow-y-auto`}>
             <div className={`grid gap-6 items-start ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
 
               {/* Add member form */}
