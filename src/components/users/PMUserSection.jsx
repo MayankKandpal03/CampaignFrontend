@@ -1,13 +1,6 @@
 /**
  * PMUserSection — 3-tab user viewer for Process Manager.
- * REFACTORED: inline styles → Tailwind CSS
- *
- * Kept inline (per rules):
- *  - Dynamic tab colors based on `active` + `rc` (role color)
- *  - Avatar colors from `rc`
- *  - gridTemplateColumns (complex CSS not expressible in Tailwind)
- *  - onMouseEnter/onMouseLeave handlers
- *  - GoldBtn style prop (component API)
+ * Nature-inspired light theme.
  */
 import { useState, useMemo } from "react";
 import { T }        from "../../constants/theme.js";
@@ -30,32 +23,32 @@ const TABS = [
 
 /* ── Base card ────────────────────────────────────────────────────────────── */
 function BaseCard({ user, extra, onDelete }) {
-  const rc = ROLE_COLORS[user.role] ?? { color: "#706658", bg: "rgba(112,102,88,0.1)" };
+  const rc = ROLE_COLORS[user.role] ?? { color: "#8a8475", bg: "rgba(138,132,117,0.08)" };
   return (
     <div
-      className="bg-[#141310] border border-[rgba(201,164,42,0.20)] rounded-md px-4.5 py-4 transition-[border-color,box-shadow] duration-200"
+      className="bg-white border border-[#e8e5de] rounded-md px-4.5 py-4 transition-[border-color,box-shadow] duration-200"
       onMouseEnter={e => {
-        e.currentTarget.style.borderColor = `${rc.color}55`;
-        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.4)";
+        e.currentTarget.style.borderColor = `${rc.color}40`;
+        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.06)";
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.borderColor = T.goldBorder;
+        e.currentTarget.style.borderColor = "#e8e5de";
         e.currentTarget.style.boxShadow = "none";
       }}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
           <div
-            className="w-8.5 h-8.5 rounded-full shrink-0 flex items-center justify-center text-[13px] font-bold font-[Cinzel,serif]"
-            style={{ background: rc.bg, border: `1px solid ${rc.color}44`, color: rc.color }}
+            className="w-8.5 h-8.5 rounded-full shrink-0 flex items-center justify-center text-[13px] font-bold font-['Fraunces',serif]"
+            style={{ background: rc.bg, border: `1px solid ${rc.color}30`, color: rc.color }}
           >
             {initials(user.username)}
           </div>
           <div>
-            <p className="m-0 text-[13px] font-semibold text-[#f5edd8] font-[Cinzel,serif]">
+            <p className="m-0 text-[13px] font-semibold text-[#1a1810] font-['Fraunces',serif]">
               {user.username}
             </p>
-            <p className="m-0 mt-0.5 text-[11px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
+            <p className="m-0 mt-0.5 text-[11px] text-[#8a8475] font-['JetBrains_Mono',monospace]">
               {user.email}
             </p>
           </div>
@@ -65,7 +58,7 @@ function BaseCard({ user, extra, onDelete }) {
           <RoleBadge role={user.role} />
           {onDelete && (
             <button
-              className="ops-del px-2.5 py-0.75 rounded-sm bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.2)] text-[#7a7060] text-[9px] font-bold tracking-widest cursor-pointer font-[Cinzel,serif]"
+              className="ops-del px-2.5 py-0.75 rounded-sm bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] text-[#8a8475] text-[9px] font-bold tracking-widest cursor-pointer font-['Fraunces',serif]"
               onClick={() => onDelete(user)}
             >
               DELETE
@@ -75,7 +68,7 @@ function BaseCard({ user, extra, onDelete }) {
       </div>
 
       {extra && (
-        <div className="mt-3 pt-2.5 border-t border-[rgba(46,44,34,0.13)]">
+        <div className="mt-3 pt-2.5 border-t border-[rgba(232,229,222,0.5)]">
           {extra}
         </div>
       )}
@@ -92,18 +85,18 @@ function ManagerCard({ manager, ppcs, onDelete }) {
 
   const extra = (
     <>
-      <p className="m-0 mb-1.5 text-[8px] tracking-[0.14em] text-[#7a7060] font-[Cinzel,serif]">
+      <p className="m-0 mb-1.5 text-[8px] tracking-[0.14em] text-[#8a8475] font-['Fraunces',serif]">
         TEAM MEMBERS ({teamPpcs.length})
       </p>
       {teamPpcs.length === 0 ? (
-        <p className="m-0 text-[11px] text-[#2e2c22] italic">No PPC members yet</p>
+        <p className="m-0 text-[11px] text-[#d4cfc6] italic">No PPC members yet</p>
       ) : (
         <div className="flex flex-col gap-1">
           {teamPpcs.map(p => (
             <div key={p._id} className="flex items-center gap-2">
-              <span className="w-1.25 h-1.25 rounded-full bg-[#5b9cf6] shrink-0" />
-              <span className="text-[11px] text-[#e8ddc8] font-medium">{p.username}</span>
-              <span className="text-[10px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
+              <span className="w-1.25 h-1.25 rounded-full bg-[#1a4f6e] shrink-0" />
+              <span className="text-[11px] text-[#2d2a24] font-medium">{p.username}</span>
+              <span className="text-[10px] text-[#8a8475] font-['JetBrains_Mono',monospace]">
                 {p.email}
               </span>
             </div>
@@ -122,10 +115,10 @@ function PPCCard({ ppc, onDelete }) {
 
   const extra = (
     <div className="flex items-center gap-2">
-      <span className="text-[9px] text-[#7a7060] tracking-widest font-[Cinzel,serif]">
+      <span className="text-[9px] text-[#8a8475] tracking-widest font-['Fraunces',serif]">
         MANAGER
       </span>
-      <span className={`text-[11px] ${managerName ? "text-[#c9a42a]" : "text-[#2e2c22]"}`}>
+      <span className={`text-[11px] ${managerName ? "text-[#2a6048]" : "text-[#d4cfc6]"}`}>
         {managerName || "Not assigned"}
       </span>
     </div>
@@ -211,7 +204,7 @@ export default function PMUserSection({ users, loading, onDelete, onRefresh }) {
                   className="px-1.5 py-px rounded-full text-[9px] font-bold font-['JetBrains_Mono',monospace]"
                   style={{
                     background: active ? (rc.color || T.gold) : T.subtle,
-                    color:      active ? "#0c0b08" : T.muted,
+                    color:      active ? "#ffffff" : T.muted,
                   }}
                 >
                   {countMap[tab.id]}
@@ -226,15 +219,15 @@ export default function PMUserSection({ users, loading, onDelete, onRefresh }) {
       </div>
 
       {loading ? (
-        <div className="py-13 px-5 text-center text-[#7a7060]">
-          <div className="mb-2.5 text-[#c9a42a] text-[22px]">◈</div>
+        <div className="py-13 px-5 text-center text-[#8a8475]">
+          <div className="mb-2.5 text-[#2a6048] text-[22px]">◈</div>
           Loading users…
         </div>
       ) : currentList || (
-        <div className="py-10 px-5 text-center bg-[#141310] border border-[rgba(201,164,42,0.20)] rounded">
-          <div className="text-[24px] text-[#2e2c22] mb-3 font-[Cinzel,serif]">◇</div>
-          <p className="m-0 text-[14px] text-[#f5edd8] font-[Cinzel,serif]">No Users Found</p>
-          <p className="m-0 mt-1.5 text-[13px] text-[#7a7060]">{EMPTY_MSGS[activeTab]}</p>
+        <div className="py-10 px-5 text-center bg-white border border-[#e8e5de] rounded">
+          <div className="text-[24px] text-[#d4cfc6] mb-3 font-['Fraunces',serif]">◇</div>
+          <p className="m-0 text-[14px] text-[#1a1810] font-['Fraunces',serif]">No Users Found</p>
+          <p className="m-0 mt-1.5 text-[13px] text-[#8a8475]">{EMPTY_MSGS[activeTab]}</p>
         </div>
       )}
     </div>

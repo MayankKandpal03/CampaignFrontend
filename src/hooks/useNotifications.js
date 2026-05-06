@@ -29,7 +29,7 @@ export const useNotifications = () => {
         console.warn("[Push] Registration on mount failed:", err.message)
       );
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Called when the user clicks "Enable Notifications".
   const handleRequestPermission = useCallback(async () => {

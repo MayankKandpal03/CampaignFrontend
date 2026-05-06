@@ -79,11 +79,11 @@ export default function LoginPage() {
   }, [formData, navigate, setUser]);
 
   return (
-    <div className="min-h-screen flex flex-col relative bg-[#050508]">
+    <div className="min-h-screen flex flex-col relative bg-[#f5f2ec]">
       <style>{`
         @keyframes twinkle {
-          from { opacity: 0.15; transform: scale(1);    }
-          to   { opacity: 1;    transform: scale(1.35); }
+          from { opacity: 0.05; transform: scale(1);    }
+          to   { opacity: 0.25; transform: scale(1.35); }
         }
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(20px); }
@@ -98,27 +98,27 @@ export default function LoginPage() {
         .anim-spinner { animation: spin .78s linear infinite; }
         .btn-label    { animation: fadeIn .22s ease both; }
         .input-spark:focus {
-          animation: sparkDark 1.9s ease-in-out infinite alternate;
+          animation: sparkLight 1.9s ease-in-out infinite alternate;
         }
-        @keyframes sparkDark {
-          from { box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 0 10px 2px rgba(255,255,255,.05); }
-          to   { box-shadow: 0 0 0 1px rgba(255,255,255,.38), 0 0 22px 6px rgba(255,255,255,.11); }
+        @keyframes sparkLight {
+          from { box-shadow: 0 0 0 1px rgba(42,96,72,.18), 0 0 10px 2px rgba(42,96,72,.05); }
+          to   { box-shadow: 0 0 0 1px rgba(42,96,72,.38), 0 0 22px 6px rgba(42,96,72,.11); }
         }
       `}</style>
 
       <StarField />
 
-      <header className="relative z-10 w-full bg-[#07070c]/90 border-b border-white/6 backdrop-blur-md">
+      <header className="relative z-10 w-full bg-white/80 border-b border-[#e8e5de] backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-[15px] bg-white/[0.07] border border-white/10 text-white">
-              X
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-[15px] bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.12)] text-[#2a6048]">
+              ✦
             </div>
             <div>
-              <h1 className="text-[17px] font-semibold tracking-tight leading-none text-white">
+              <h1 className="text-[17px] font-semibold tracking-tight leading-none text-[#1a1810] font-['Fraunces',serif]">
                 Sat Kartar
               </h1>
-              <p className="text-[10px] font-medium uppercase tracking-[0.18em] mt-0.5 text-white/30">
+              <p className="text-[10px] font-medium uppercase tracking-[0.18em] mt-0.5 text-[#8a8475]">
                 Campaign Suite
               </p>
             </div>
@@ -128,23 +128,23 @@ export default function LoginPage() {
 
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 py-16">
         <div className="w-full max-w-105 anim-card">
-          <div className="rounded-2xl p-9 backdrop-blur-xl bg-white/4 border border-white/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_24px_60px_rgba(0,0,0,0.6)]">
+          <div className="rounded-2xl p-9 backdrop-blur-xl bg-white/70 border border-[#e8e5de] shadow-[0_0_0_1px_rgba(42,96,72,0.04),0_24px_60px_rgba(0,0,0,0.08)]">
             <div className="mb-8">
               <h2
                 key={isSuccess ? "welcome" : "signin"}
                 style={{ animation: "fadeIn .38s ease both" }}
-                className="text-[28px] font-semibold tracking-tight leading-tight mb-2 text-white"
+                className="text-[28px] font-semibold tracking-tight leading-tight mb-2 text-[#1a1810] font-['Fraunces',serif]"
               >
                 {isSuccess ? `Welcome, ${welcomeName}` : "Sign in"}
               </h2>
-              <p className="text-[13.5px] leading-relaxed text-white/40">
+              <p className="text-[13.5px] leading-relaxed text-[#8a8475]">
                 {isSuccess
                   ? "Login successful. Taking you to your dashboard…"
                   : "Access your campaign dashboard to manage requests, track approvals, and coordinate with your team."}
               </p>
             </div>
 
-            <div className="border-t mb-7 border-white/8" />
+            <div className="border-t mb-7 border-[#e8e5de]" />
 
             {/* Error banner */}
             <div style={{
@@ -154,7 +154,7 @@ export default function LoginPage() {
               marginBottom: error ? "20px" : "0",
               transition:   "max-height .45s cubic-bezier(.22,1,.36,1), opacity .35s ease, margin-bottom .35s ease",
             }}>
-              <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-[13px] font-medium bg-red-500/10 border border-red-500/20 text-red-400">
+              <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-[13px] font-medium bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] text-[#b83030]">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 shrink-0 mt-0.5">
                   <circle cx="12" cy="12" r="10"/>
                   <line x1="12" y1="8" x2="12" y2="12"/>
@@ -167,7 +167,7 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {FIELDS.map(({ name, type, placeholder, label }) => (
                 <div key={name} className="space-y-2">
-                  <label htmlFor={name} className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45">
+                  <label htmlFor={name} className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8a8475]">
                     {label}
                   </label>
                   <input
@@ -181,7 +181,7 @@ export default function LoginPage() {
                     autoCapitalize="off"
                     autoCorrect="off"
                     spellCheck="false"
-                    className="input-spark w-full px-4 py-2.75 rounded-xl text-[13.5px] outline-none transition-colors duration-300 disabled:opacity-50 bg-white/6 border border-white/12 text-white placeholder-white/20 focus:border-white/35 focus:bg-white/8"
+                    className="input-spark w-full px-4 py-2.75 rounded-xl text-[13.5px] outline-none transition-colors duration-300 disabled:opacity-50 bg-[#faf8f5] border border-[#e8e5de] text-[#2d2a24] placeholder-[#c4bfb4] focus:border-[rgba(42,96,72,0.35)] focus:bg-white"
                   />
                 </div>
               ))}
@@ -194,8 +194,8 @@ export default function LoginPage() {
                   flex items-center justify-center gap-2 mt-1 cursor-pointer transition-all duration-500
                   disabled:cursor-not-allowed
                   ${isBusy
-                    ? "bg-white/75 text-[#050508]/70"
-                    : "bg-white text-[#050508] hover:bg-white/90 shadow-[0_4px_24px_rgba(255,255,255,0.15)]"
+                    ? "bg-[#2a6048]/80 text-white"
+                    : "bg-[#2a6048] text-white hover:bg-[#225138] shadow-[0_4px_24px_rgba(42,96,72,0.15)]"
                   }`}
               >
                 <span key={status} className="btn-label flex items-center gap-2">
@@ -216,29 +216,29 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-7 text-center text-[12px] text-white/25">
+            <p className="mt-7 text-center text-[12px] text-[#8a8475]">
               Need to change your password?{" "}
-              <span className="font-medium cursor-pointer text-white/55 hover:text-white transition-colors duration-200">
+              <span className="font-medium cursor-pointer text-[#2a6048] hover:text-[#1a1810] transition-colors duration-200">
                 Contact your admin
               </span>
             </p>
           </div>
-          <p className="mt-4 text-center text-[11px] text-white/15">
+          <p className="mt-4 text-center text-[11px] text-[#c4bfb4]">
             Protected by enterprise-grade security
           </p>
         </div>
       </main>
 
-      <footer className="relative z-10 w-full bg-[#07070c]/80 border-t border-white/5 backdrop-blur-md">
+      <footer className="relative z-10 w-full bg-white/60 border-t border-[#e8e5de] backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-[11.5px] text-white/20">
+          <p className="text-[11.5px] text-[#8a8475]">
             © {new Date().getFullYear()} XYZ Inc. All rights reserved.
           </p>
-          <div className="flex items-center gap-3.5 text-[11.5px] text-white/20">
+          <div className="flex items-center gap-3.5 text-[11.5px] text-[#8a8475]">
             {["Privacy", "Terms", "Support"].map((item, i, arr) => (
               <span key={item} className="flex items-center gap-3.5">
                 <span className="cursor-pointer hover:opacity-70 transition-opacity duration-200">{item}</span>
-                {i < arr.length - 1 && <span className="w-1 h-1 rounded-full bg-white/10" />}
+                {i < arr.length - 1 && <span className="w-1 h-1 rounded-full bg-[#d4cfc6]" />}
               </span>
             ))}
           </div>

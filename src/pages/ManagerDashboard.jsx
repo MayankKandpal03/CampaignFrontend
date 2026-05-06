@@ -10,7 +10,7 @@ import { useResponsive } from "../hooks/useResponsive.js";
 import { useSocket }     from "../hooks/useSocket.js";
 import { useLogout }     from "../hooks/useLogout.js";
 import { useTeam }       from "../hooks/useTeam.js";
-import { T, inputSx }              from "../constants/theme.js";
+import { T }              from "../constants/theme.js";
 import { STATUS_META, ACTION_META } from "../constants/statusMeta.js";
 import { FILTER_CARDS }             from "../constants/filterCards.js";
 import { fmt, initials, toLocalISO, localToUTC } from "../utils/formatters.js";
@@ -34,15 +34,14 @@ import UserCard         from "../components/users/UserCard.jsx";
 const COLS = ["Created By","Message","Requested Time","Status","PM Action","Ticket State"];
 
 const Th = ({ children }) => (
-  <th className="px-4 py-2.5 text-left text-[8.5px] font-semibold text-[#706658] tracking-[0.14em] font-['Cinzel',serif] uppercase whitespace-nowrap">
+  <th className="px-4 py-2.5 text-left text-[8.5px] font-semibold text-[#8a8475] tracking-[0.14em] font-['Fraunces',serif] uppercase whitespace-nowrap">
     {children}
   </th>
 );
 
-// Shared input class — ensures text is always visible (bug fix for black-on-black)
 const INPUT_CLS =
-  "ops-focus w-full box-border bg-[#0a0908] border border-[#2e2c22] rounded-lg " +
-  "text-[#e8ddc8] text-[13px] px-[14px] py-[11px] outline-none " +
+  "ops-focus w-full box-border bg-[#faf8f5] border border-[#e8e5de] rounded-lg " +
+  "text-[#2d2a24] text-[13px] px-[14px] py-[11px] outline-none " +
   "font-['DM_Sans',sans-serif] transition-[border-color,box-shadow] duration-200";
 
 export default function ManagerDashboard() {
@@ -78,7 +77,7 @@ export default function ManagerDashboard() {
       new Date(c.scheduleAt).getTime() > now &&
       new Date(c.scheduleAt).getTime() <= currentReal
     );
-    if (justFired) { setNow(currentReal); return; }
+    if (justFired) { setTimeout(() => setNow(currentReal), 0); return; }
     const nextTime = campaigns
       .filter(c => c.scheduleAt)
       .map(c => new Date(c.scheduleAt).getTime())
@@ -215,13 +214,13 @@ export default function ManagerDashboard() {
     { id:"team",   label: "Team Members",  count: ppcMembers.length },
   ];
 
-  const pad = isMobile ? "16px 14px" : "22px 28px";
+
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0c0b08] text-[#e8ddc8] font-['DM_Sans',sans-serif]">
+    <div className="flex h-screen overflow-hidden bg-[#faf8f4] text-[#2d2a24] font-['DM_Sans',sans-serif]">
       <OpsGlobalStyles/>
       {isMobile && sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-7999 bg-black/75 backdrop-blur-sm"/>
+        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-7999 bg-black/20 backdrop-blur-sm"/>
       )}
 
       <DashboardSidebar
@@ -240,7 +239,7 @@ export default function ManagerDashboard() {
         />
 
         {pageError && (
-          <div className="mx-7 mt-4 px-4 py-2.75 bg-[rgba(224,82,82,0.12)] border border-[#e0525244] rounded-lg text-[#e05252] text-xs">
+          <div className="mx-7 mt-4 px-4 py-2.75 bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] rounded-lg text-[#b83030] text-xs">
             {pageError}
           </div>
         )}
@@ -253,7 +252,7 @@ export default function ManagerDashboard() {
               onSelect={id => setStatusFilter(p => p===id ? null : id)} isMobile={isMobile}
             />
 
-            <div className="bg-[#141310] border border-[#2e2c22] rounded-[10px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.3)] flex-1 flex flex-col min-h-0">
+            <div className="bg-white border border-[#e8e5de] rounded-[10px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex-1 flex flex-col min-h-0">
               <TableToolbar
                 title="TEAM TASKS" count={filtered.length} search={searchQuery} onSearch={setSearchQuery}
                 activeFilter={statusFilter} onClearFilter={() => setStatusFilter(null)} isMobile={isMobile}
@@ -261,8 +260,8 @@ export default function ManagerDashboard() {
 
               <div className="flex-1 overflow-auto min-h-0">
                 {camLoading ? (
-                  <div className="py-14 px-5 text-center text-[#7a7060]">
-                    <div className="w-8 h-8 rounded-full border-2 border-[#2e2c22] border-t-[#c9a42a] mx-auto mb-3.5 animate-[opsSpinner_0.8s_linear_infinite]"/>
+                  <div className="py-14 px-5 text-center text-[#8a8475]">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#e8e5de] border-t-[#2a6048] mx-auto mb-3.5 animate-[opsSpinner_0.8s_linear_infinite]"/>
                     <p className="m-0 text-[13px]">Loading…</p>
                   </div>
                 ) : filtered.length === 0 ? (
@@ -274,7 +273,7 @@ export default function ManagerDashboard() {
                 ) : (
                   <table className="w-full border-collapse min-w-190">
                     <thead className="sticky top-0 z-1">
-                      <tr className="border-b border-[#2e2c2222] bg-[#0c0b08ee] sticky-header-row">
+                      <tr className="border-b border-[#e8e5de] bg-[#f8f7f4] sticky-header-row">
                         {COLS.map(h => <Th key={h}>{h}</Th>)}
                       </tr>
                     </thead>
@@ -303,27 +302,27 @@ export default function ManagerDashboard() {
                         return (
                           <tr
                             key={c._id}
-                            className={`ops-row border-b border-[rgba(46,44,34,0.13)] ${i%2===1 ? "bg-[rgba(20,19,16,0.5)]" : "bg-transparent"}`}
+                            className={`ops-row border-b border-[#e8e5de] ${i%2===1 ? "bg-[#f8f7f4]" : "bg-transparent"}`}
                           >
                             <td className="p-[12px_16px] whitespace-nowrap">
                               <div className="flex items-center gap-1.75">
                                 <div
-                                  className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold font-['Cinzel',serif] ${isOwn ? "bg-[rgba(201,164,42,0.13)] border border-[rgba(201,164,42,0.27)] text-[#c9a42a]" : "bg-[rgba(167,139,250,0.11)] border border-[rgba(167,139,250,0.27)] text-[#a78bfa]"}`}
+                                  className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[9px] font-bold font-['Fraunces',serif] ${isOwn ? "bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.12)] text-[#2a6048]" : "bg-[rgba(26,79,110,0.08)] border border-[rgba(26,79,110,0.12)] text-[#1a4f6e]"}`}
                                 >
                                   {initials(creatorName || user || "M")}
                                 </div>
-                                <span className={`text-xs ${isOwn ? "text-[#c9a42a]" : "text-[#e8ddc8]"}`}>
+                                <span className={`text-xs ${isOwn ? "text-[#2a6048]" : "text-[#2d2a24]"}`}>
                                   {creatorName || user || "—"}
                                 </span>
                               </div>
                             </td>
                             <td className="p-[12px_16px] min-w-40 max-w-70">
-                              <p className="m-0 text-xs text-[#e8ddc8] leading-[1.55] wrap-break-word whitespace-pre-wrap">
+                              <p className="m-0 text-xs text-[#2d2a24] leading-[1.55] wrap-break-word whitespace-pre-wrap">
                                 {c.message}
                               </p>
                             </td>
                             <td className="p-[12px_16px] whitespace-nowrap">
-                              <span className="text-[11px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
+                              <span className="text-[11px] text-[#8a8475] font-['JetBrains_Mono',monospace]">
                                 {fmt(c.requestedAt)}
                               </span>
                             </td>
@@ -336,13 +335,13 @@ export default function ManagerDashboard() {
                             <td className="p-[12px_16px] whitespace-nowrap">
                               {canUpdate ? (
                                 <button
-                                  className="ops-upd px-3 py-1 rounded-full bg-[rgba(240,160,48,0.11)] border border-[#f0a03044] text-[#f0a030] text-[9px] font-bold tracking-widest cursor-pointer font-['Cinzel',serif] uppercase"
+                                  className="ops-upd px-3 py-1 rounded-full bg-[rgba(143,66,12,0.08)] border border-[rgba(143,66,12,0.18)] text-[#8f420c] text-[9px] font-bold tracking-widest cursor-pointer font-['Fraunces',serif] uppercase"
                                   onClick={() => setUpdateTarget(c)}
                                 >
                                   Update
                                 </button>
                               ) : (
-                              <span className={`inline-flex items-center gap-1 text-[9px] tracking-[0.1em] font-bold font-['Cinzel',serif] uppercase`} style={{ color: ticketColor }}>
+                              <span className={`inline-flex items-center gap-1 text-[9px] tracking-[0.1em] font-bold font-['Fraunces',serif] uppercase`} style={{ color: ticketColor }}>
                                   <span className="w-1 h-1 rounded-full" style={{ background: ticketColor }}/>
                                   {ticketLabel}
                                 </span>
@@ -357,12 +356,12 @@ export default function ManagerDashboard() {
               </div>
 
               {!camLoading && filtered.length > 0 && (
-                <div className="px-4.5-py-2.25rder-t border-[#2e2c2222] flex justify-between bg-[rgba(12,11,8,0.6)] shrink-0">
-                  <span className="text-[9px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
+                <div className="px-4.5 py-2.25 border-t border-[#e8e5de] flex justify-between bg-[#f8f7f4] shrink-0">
+                  <span className="text-[9px] text-[#8a8475] font-['JetBrains_Mono',monospace]">
                     {filtered.length} of {campaigns.length} tasks
                   </span>
-                  <span className="text-[9px] text-[#2e2c22] font-['JetBrains_Mono',monospace] flex items-center gap-1.25">
-                    <span className="w-1 h-1 rounded-full bg-[#4cbb7f] animate-[opsPulse_2s_infinite]"/>
+                  <span className="text-[9px] text-[#8a8475] font-['JetBrains_Mono',monospace] flex items-center gap-1.25">
+                    <span className="w-1 h-1 rounded-full bg-[#2a6048] animate-[opsPulse_2s_infinite]"/>
                     Live updates active
                   </span>
                 </div>
@@ -376,31 +375,31 @@ export default function ManagerDashboard() {
           <div className={`${isMobile ? "px-3.5 py-4" : "px-7 py-5.5"} flex-1`}>
             <div className="max-w-140">
               {/* Team status */}
-              <div className={`flex items-center gap-2.5 p-[10px_16px] mb-5 bg-[#141310] rounded-lg border ${teamId ? "border-[#2e2c22]" : "border-[#e0525244]"}`}>
-                <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${teamId ? "bg-[#4cbb7f] shadow-[0_0_8px_#4cbb7f]" : "bg-[#e05252]"}`}/>
+              <div className={`flex items-center gap-2.5 p-[10px_16px] mb-5 bg-white rounded-lg border ${teamId ? "border-[#e8e5de]" : "border-[rgba(184,48,48,0.2)]"}`}>
+                <span className={`w-[7px] h-[7px] rounded-full shrink-0 ${teamId ? "bg-[#2a6048] shadow-[0_0_8px_rgba(42,96,72,0.4)]" : "bg-[#b83030]"}`}/>
                 <div>
-                  <p className="m-0 text-[9px] text-[#7a7060] tracking-[0.14em] font-['Cinzel',serif] uppercase">
+                  <p className="m-0 text-[9px] text-[#8a8475] tracking-[0.14em] font-['Fraunces',serif] uppercase">
                     {teamId ? "Team Resolved" : "Team Not Found"}
                   </p>
-                  <p className={`m-0 mt-0.5 text-[11px] font-['JetBrains_Mono',monospace] ${teamId ? "text-[#c9a42a]" : "text-[#e05252]"}`}>
+                  <p className={`m-0 mt-0.5 text-[11px] font-['JetBrains_Mono',monospace] ${teamId ? "text-[#2a6048]" : "text-[#b83030]"}`}>
                     {teamId ? `${String(teamId).slice(0,24)}…` : "Please wait or refresh"}
                   </p>
                 </div>
               </div>
 
               <div
-                className={`bg-[#141310] border border-[#2e2c22] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.3)] ${isMobile ? "p-[22px_18px]" : "p-[28px_28px_24px]"}`}
+                className={`bg-white border border-[#e8e5de] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.06)] ${isMobile ? "p-[22px_18px]" : "p-[28px_28px_24px]"}`}
               >
-                <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(200,168,74,0.6)] font-['Cinzel',serif] uppercase">New Request</p>
-                <h2 className="m-0 mb-5.5 text-lg font-semibold text-[#f5edd8] font-['Cinzel',serif]">Create Task</h2>
+                <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(42,96,72,0.6)] font-['Fraunces',serif] uppercase">New Request</p>
+                <h2 className="m-0 mb-5.5 text-lg font-semibold text-[#1a1810] font-['Fraunces',serif]">Create Task</h2>
 
                 {createError && (
-                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(224,82,82,0.12)] border border-[#e0525244] text-[#e05252] text-xs">
+                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] text-[#b83030] text-xs">
                     {createError}
                   </div>
                 )}
                 {createOk && (
-                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(76,187,127,0.11)] border border-[#4cbb7f44] text-[#4cbb7f] text-xs flex items-center gap-2">
+                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.15)] text-[#2a6048] text-xs flex items-center gap-2">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Campaign created
                   </div>
@@ -425,7 +424,7 @@ export default function ManagerDashboard() {
                       onChange={e => setCreateForm(f => ({ ...f, requestedAt: e.target.value }))}
                     />
                   </Field>
-                  <div className="border-t border-[#2e2c22] pt-5 mt-1.5">
+                  <div className="border-t border-[#e8e5de] pt-5 mt-1.5">
                     <GoldBtn type="submit" disabled={creating || !teamId} style={{ width:"100%", padding:"13px" }}>
                       {creating ? "Creating…" : !teamId ? "Loading Team…" : "Create Task"}
                     </GoldBtn>
@@ -442,17 +441,17 @@ export default function ManagerDashboard() {
             <div className={`grid gap-6 items-start ${isMobile ? "grid-cols-1" : "grid-cols-2"}`}>
 
               {/* Add member form */}
-              <div className="bg-[#141310] border border-[#2e2c22] rounded-[10px] p-[24px_22px] shadow-[0_2px_12px_rgba(0,0,0,0.3)]">
-                <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(200,168,74,0.6)] font-['Cinzel',serif] uppercase">Add Member</p>
-                <h2 className="m-0 mb-5 text-base font-semibold text-[#f5edd8] font-['Cinzel',serif]">Add PPC Member</h2>
+              <div className="bg-white border border-[#e8e5de] rounded-[10px] p-[24px_22px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(42,96,72,0.6)] font-['Fraunces',serif] uppercase">Add Member</p>
+                <h2 className="m-0 mb-5 text-base font-semibold text-[#1a1810] font-['Fraunces',serif]">Add PPC Member</h2>
 
                 {userError && (
-                  <div className="px-3.5 py-2.5 rounded-lg mb-4 bg-[rgba(224,82,82,0.12)] border border-[#e0525244] text-[#e05252] text-xs">
+                  <div className="px-3.5 py-2.5 rounded-lg mb-4 bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] text-[#b83030] text-xs">
                     {userError}
                   </div>
                 )}
                 {userOk && (
-                  <div className="px-3.5 py-2.5 rounded-lg mb-4 bg-[rgba(76,187,127,0.11)] border border-[#4cbb7f44] text-[#4cbb7f] text-xs flex items-center gap-2">
+                  <div className="px-3.5 py-2.5 rounded-lg mb-4 bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.15)] text-[#2a6048] text-xs flex items-center gap-2">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     PPC member added
                   </div>
@@ -489,7 +488,7 @@ export default function ManagerDashboard() {
                       required
                     />
                   </Field>
-                  <div className="border-t border-[#2e2c22] pt-4.5 mt-0.5">
+                  <div className="border-t border-[#e8e5de] pt-4.5 mt-0.5">
                     <GoldBtn type="submit" disabled={creatingUser} style={{ width:"100%", padding:"12px" }}>
                       {creatingUser ? "Adding…" : "Add PPC Member"}
                     </GoldBtn>
@@ -500,9 +499,9 @@ export default function ManagerDashboard() {
               {/* Team members list */}
               <div>
                 <div className="flex justify-between items-center mb-3.5">
-                  <p className="m-0 text-[8px] text-[#7a7060] tracking-[0.2em] font-['Cinzel',serif] uppercase">Team Members</p>
+                  <p className="m-0 text-[8px] text-[#8a8475] tracking-[0.2em] font-['Fraunces',serif] uppercase">Team Members</p>
                   <div className="flex gap-2 items-center">
-                    <span className="px-2.25 py-0.5 rounded-full bg-[rgba(201,164,42,0.13)] border border-[rgba(201,164,42,0.20)] text-[9px] text-[#c9a42a] font-['JetBrains_Mono',monospace] font-semibold">
+                    <span className="px-2.25 py-0.5 rounded-full bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.12)] text-[9px] text-[#2a6048] font-['JetBrains_Mono',monospace] font-semibold">
                       {ppcMembers.length}
                     </span>
                     <GoldBtn variant="outline" onClick={loadTeamInfo} style={{ padding:"5px 12px", fontSize:9 }}>Refresh</GoldBtn>
@@ -510,14 +509,14 @@ export default function ManagerDashboard() {
                 </div>
 
                 {teamLoading ? (
-                  <div className="py-10 px-5 text-center text-[#7a7060]">
-                    <div className="w-7 h-7 rounded-full border-2 border-[#2e2c22] border-t-[#c9a42a] mx-auto mb-3 animate-[opsSpinner_0.8s_linear_infinite]"/>
+                  <div className="py-10 px-5 text-center text-[#8a8475]">
+                    <div className="w-7 h-7 rounded-full border-2 border-[#e8e5de] border-t-[#2a6048] mx-auto mb-3 animate-[opsSpinner_0.8s_linear_infinite]"/>
                     Loading…
                   </div>
                 ) : ppcMembers.length === 0 ? (
-                  <div className="py-10 px-5 text-center bg-[#141310] border border-[#2e2c22] rounded-[10px]">
-                    <p className="m-0 text-[13px] text-[#f5edd8] font-['Cinzel',serif]">No PPC Members Yet</p>
-                    <p className="m-0 mt-1.5 text-xs text-[#7a7060]">Add your first member using the form.</p>
+                  <div className="py-10 px-5 text-center bg-white border border-[#e8e5de] rounded-[10px]">
+                    <p className="m-0 text-[13px] text-[#1a1810] font-['Fraunces',serif]">No PPC Members Yet</p>
+                    <p className="m-0 mt-1.5 text-xs text-[#8a8475]">Add your first member using the form.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2.5">

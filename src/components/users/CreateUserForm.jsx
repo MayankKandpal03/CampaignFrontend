@@ -1,5 +1,6 @@
 /**
  * CreateUserForm — role-aware user creation form.
+ * Nature-inspired light theme.
  */
 import { useState } from "react";
 import Field from "../common/Field.jsx";
@@ -54,18 +55,18 @@ export default function CreateUserForm({ allowedRoles = ["ppc"], onSuccess }) {
     }
   };
 
-  const inputCls = "ops-focus w-full box-border bg-[#0a0908] border border-[#2e2c22] rounded text-[#e8ddc8] text-[13px] px-[14px] py-[11px] outline-none font-['DM_Sans',sans-serif] transition-[border-color,box-shadow] duration-200";
+  const inputCls = "ops-focus w-full box-border bg-[#faf8f5] border border-[#e8e5de] rounded text-[#2d2a24] text-[13px] px-[14px] py-[11px] outline-none font-['DM_Sans',sans-serif] transition-[border-color,box-shadow] duration-200";
 
   return (
     <form onSubmit={handleSubmit}>
       {error && (
-        <div className="px-3.5 py-2.5 rounded mb-4 bg-[rgba(224,82,82,0.12)] border border-[rgba(224,82,82,0.27)] text-[#e05252] text-xs">
+        <div className="px-3.5 py-2.5 rounded mb-4 bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] text-[#b83030] text-xs">
           {error}
         </div>
       )}
 
       {ok && (
-        <div className="px-3.5 py-2.5 rounded mb-4 bg-[rgba(76,187,127,0.11)] border border-[rgba(76,187,127,0.27)] text-[#4cbb7f] text-[11px] font-['Cinzel',serif] tracking-[0.08em]">
+        <div className="px-3.5 py-2.5 rounded mb-4 bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.15)] text-[#2a6048] text-[11px] font-['Fraunces',serif] tracking-[0.08em]">
           ✓ USER CREATED SUCCESSFULLY
         </div>
       )}
@@ -117,7 +118,7 @@ export default function CreateUserForm({ allowedRoles = ["ppc"], onSuccess }) {
         </Field>
       )}
 
-      <div className="border-t border-[#2e2c22] pt-5 mt-1.5">
+      <div className="border-t border-[#e8e5de] pt-5 mt-1.5">
         <GoldBtn type="submit" disabled={loading} style={{ width: "100%", padding: "13px" }}>
           {loading ? "CREATING…" : "CREATE USER"}
         </GoldBtn>

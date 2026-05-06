@@ -1,9 +1,6 @@
 // src/components/messages/SavedMessagesSection.jsx
 /**
- * SavedMessagesSection
- *
- * CHANGES:
- *  - Added search bar to filter messages by content.
+ * SavedMessagesSection — Nature-inspired light theme.
  */
 import { useState, useCallback, useEffect } from "react";
 import { T, inputSx } from "../../constants/theme.js";
@@ -127,7 +124,7 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
     }
   }, [msg._id, onDeleted]);
 
-  const cardBorder = editing ? T.gold : T.goldBorder;
+  const cardBorder = editing ? T.gold : "#e8e5de";
 
   return (
     <div
@@ -141,13 +138,13 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
       }}
       onMouseEnter={e => {
         if (!editing) {
-          e.currentTarget.style.borderColor = `${T.gold}55`;
-          e.currentTarget.style.boxShadow   = "0 4px 20px rgba(0,0,0,.4)";
+          e.currentTarget.style.borderColor = `${T.gold}40`;
+          e.currentTarget.style.boxShadow   = "0 4px 20px rgba(0,0,0,.06)";
         }
       }}
       onMouseLeave={e => {
         if (!editing) {
-          e.currentTarget.style.borderColor = T.goldBorder;
+          e.currentTarget.style.borderColor = "#e8e5de";
           e.currentTarget.style.boxShadow   = "none";
         }
       }}
@@ -183,10 +180,10 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                 flex:1, padding:"8px", borderRadius:7, cursor:"pointer",
                 background:"transparent", border:`1px solid ${T.subtle}`,
                 color:T.muted, fontSize:11, fontWeight:600,
-                letterSpacing:"0.1em", fontFamily:"'Cinzel',serif",
+                letterSpacing:"0.1em", fontFamily:"'Fraunces',serif",
                 textTransform:"uppercase", transition:"all .15s",
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = T.goldBorder; e.currentTarget.style.color = T.gold; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = `${T.gold}40`; e.currentTarget.style.color = T.gold; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = T.subtle; e.currentTarget.style.color = T.muted; }}
             >
               Cancel
@@ -215,7 +212,7 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
               padding:      "9px 12px",
               borderRadius: 6,
               background:   T.redBg,
-              border:       `1px solid ${T.red}33`,
+              border:       `1px solid ${T.red}25`,
             }}>
               <span style={{ flex:1, fontSize:11, color:T.red, fontFamily:"'DM Sans',sans-serif" }}>
                 Delete this message?
@@ -227,7 +224,7 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                   padding:"4px 12px", borderRadius:4, cursor: deleting ? "not-allowed" : "pointer",
                   background:T.red, border:"none", color:"#fff",
                   fontSize:10, fontWeight:700, letterSpacing:"0.1em",
-                  fontFamily:"'Cinzel',serif", opacity: deleting ? 0.6 : 1,
+                  fontFamily:"'Fraunces',serif", opacity: deleting ? 0.6 : 1,
                   transition:"opacity .15s",
                 }}
               >
@@ -240,9 +237,9 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                   padding:"4px 12px", borderRadius:4, cursor:"pointer",
                   background:"transparent", border:`1px solid ${T.subtle}`,
                   color:T.muted, fontSize:10, fontWeight:600,
-                  fontFamily:"'Cinzel',serif", transition:"all .15s",
+                  fontFamily:"'Fraunces',serif", transition:"all .15s",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = T.gold; e.currentTarget.style.borderColor = T.goldBorder; }}
+                onMouseEnter={e => { e.currentTarget.style.color = T.gold; e.currentTarget.style.borderColor = `${T.gold}40`; }}
                 onMouseLeave={e => { e.currentTarget.style.color = T.muted; e.currentTarget.style.borderColor = T.subtle; }}
               >
                 No
@@ -259,27 +256,27 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                   padding:       "5px 13px",
                   borderRadius:  99,
                   cursor:        "pointer",
-                  border:        `1px solid ${copied ? T.green+"55" : T.goldBorder}`,
-                  background:    copied ? T.greenBg : T.goldDim,
+                  border:        `1px solid ${copied ? T.green+"40" : "#e8e5de"}`,
+                  background:    copied ? T.greenBg : "rgba(42,96,72,0.06)",
                   color:         copied ? T.green   : T.gold,
                   fontSize:      10,
                   fontWeight:    600,
                   letterSpacing: "0.1em",
-                  fontFamily:    "'Cinzel', serif",
+                  fontFamily:    "'Fraunces', serif",
                   textTransform: "uppercase",
                   transition:    "all .15s ease",
                   flexShrink:    0,
                 }}
                 onMouseEnter={e => {
                   if (!copied) {
-                    e.currentTarget.style.background   = `${T.gold}22`;
-                    e.currentTarget.style.borderColor  = T.gold;
+                    e.currentTarget.style.background   = `${T.gold}15`;
+                    e.currentTarget.style.borderColor  = `${T.gold}40`;
                   }
                 }}
                 onMouseLeave={e => {
                   if (!copied) {
-                    e.currentTarget.style.background   = T.goldDim;
-                    e.currentTarget.style.borderColor  = T.goldBorder;
+                    e.currentTarget.style.background   = "rgba(42,96,72,0.06)";
+                    e.currentTarget.style.borderColor  = "#e8e5de";
                   }
                 }}
                 title="Copy to clipboard"
@@ -301,12 +298,12 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                   borderRadius: 4,
                   cursor:     "pointer",
                   background: T.amberBg,
-                  border:     `1px solid ${T.amber}44`,
+                  border:     `1px solid ${T.amber}30`,
                   color:      T.amber,
                   fontSize:   9,
                   fontWeight: 700,
                   letterSpacing:"0.1em",
-                  fontFamily: "'Cinzel', serif",
+                  fontFamily: "'Fraunces', serif",
                   textTransform:"uppercase",
                 }}
                 title="Edit message"
@@ -325,12 +322,12 @@ function MessageCard({ msg, onUpdated, onDeleted }) {
                   borderRadius: 4,
                   cursor:     "pointer",
                   background: T.redBg,
-                  border:     `1px solid ${T.red}33`,
+                  border:     `1px solid ${T.red}25`,
                   color:      T.muted,
                   fontSize:   9,
                   fontWeight: 700,
                   letterSpacing:"0.1em",
-                  fontFamily: "'Cinzel', serif",
+                  fontFamily: "'Fraunces', serif",
                   textTransform:"uppercase",
                 }}
                 title="Delete message"
@@ -355,7 +352,7 @@ export default function SavedMessagesSection({ isMobile }) {
   const [createErr,setCreateErr]= useState("");
   const [createOk, setCreateOk] = useState(false);
 
-  // ── NEW: search state ──────────────────────────────────────────────────────
+  // ── Search state ──────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
@@ -367,7 +364,7 @@ export default function SavedMessagesSection({ isMobile }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── NEW: filtered list ─────────────────────────────────────────────────────
+  // ── Filtered list ─────────────────────────────────────────────────────
   const filteredMessages = messages.filter(m =>
     m.message.toLowerCase().includes(search.toLowerCase())
   );
@@ -411,7 +408,7 @@ export default function SavedMessagesSection({ isMobile }) {
         marginBottom: 24,
         padding:      "12px 18px",
         background:   T.bgCard,
-        border:       `1px solid ${T.gold}25`,
+        border:       `1px solid #e8e5de`,
         borderRadius: 8,
         flexShrink:   0,
       }}>
@@ -434,24 +431,24 @@ export default function SavedMessagesSection({ isMobile }) {
           border:      `1px solid ${T.subtle}`,
           borderRadius:10,
           padding:     "24px 22px",
-          boxShadow:   "0 2px 12px rgba(0,0,0,0.3)",
+          boxShadow:   "0 1px 3px rgba(0,0,0,0.04)",
           position:    isMobile ? "static" : "sticky",
           top:         80,
         }}>
-          <p style={{ margin:"0 0 4px", fontSize:8, letterSpacing:"0.22em", color:"rgba(200,168,74,0.6)", fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>
+          <p style={{ margin:"0 0 4px", fontSize:8, letterSpacing:"0.22em", color:"rgba(42,96,72,0.6)", fontFamily:"'Fraunces',serif", textTransform:"uppercase" }}>
             New Entry
           </p>
-          <h2 style={{ margin:"0 0 20px", fontSize:16, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>
+          <h2 style={{ margin:"0 0 20px", fontSize:16, fontWeight:600, color:T.white, fontFamily:"'Fraunces',serif" }}>
             Save a Message
           </h2>
 
           {createErr && (
-            <div style={{ padding:"10px 14px", borderRadius:6, marginBottom:16, background:T.redBg, border:`1px solid ${T.red}44`, color:T.red, fontSize:12 }}>
+            <div style={{ padding:"10px 14px", borderRadius:6, marginBottom:16, background:T.redBg, border:`1px solid ${T.red}30`, color:T.red, fontSize:12 }}>
               {createErr}
             </div>
           )}
           {createOk && (
-            <div style={{ padding:"10px 14px", borderRadius:6, marginBottom:16, background:T.greenBg, border:`1px solid ${T.green}44`, color:T.green, fontSize:12, display:"flex", alignItems:"center", gap:8 }}>
+            <div style={{ padding:"10px 14px", borderRadius:6, marginBottom:16, background:T.greenBg, border:`1px solid ${T.green}30`, color:T.green, fontSize:12, display:"flex", alignItems:"center", gap:8 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
               Message saved successfully
             </div>
@@ -490,7 +487,7 @@ export default function SavedMessagesSection({ isMobile }) {
         <div>
           {/* Header with search */}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12, flexWrap:"wrap", gap:10 }}>
-            <p style={{ margin:0, fontSize:8, color:T.muted, letterSpacing:"0.2em", fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>
+            <p style={{ margin:0, fontSize:8, color:T.muted, letterSpacing:"0.2em", fontFamily:"'Fraunces',serif", textTransform:"uppercase" }}>
               Saved Messages
             </p>
             <div style={{ display:"flex", gap:8, alignItems:"center" }}>
@@ -512,7 +509,7 @@ export default function SavedMessagesSection({ isMobile }) {
             </div>
           </div>
 
-          {/* ── NEW: Search bar ── */}
+          {/* ── Search bar ── */}
           <div style={{ position:"relative", marginBottom:16 }}>
             <span style={{
               position:      "absolute",
@@ -585,10 +582,10 @@ export default function SavedMessagesSection({ isMobile }) {
                 margin:         "0 auto 14px",
               }}>
                 <svg width="20" height="20" viewBox="0 0 36 36" fill="none">
-                  <polygon points="18,4 32,18 18,32 4,18" fill="none" stroke="rgba(200,168,74,0.4)" strokeWidth="1.5"/>
+                  <path d="M18 4 C26 8, 30 16, 28 24 C26 30, 20 34, 18 34 C16 34, 10 30, 8 24 C6 16, 10 8, 18 4Z" fill="rgba(42,96,72,0.06)" stroke="rgba(42,96,72,0.25)" strokeWidth="1"/>
                 </svg>
               </div>
-              <p style={{ margin:0, fontSize:14, fontWeight:600, color:T.white, fontFamily:"'Cinzel',serif" }}>
+              <p style={{ margin:0, fontSize:14, fontWeight:600, color:T.white, fontFamily:"'Fraunces',serif" }}>
                 {search ? "No Messages Found" : "No Messages Yet"}
               </p>
               <p style={{ margin:"8px 0 0", fontSize:13, color:T.muted }}>

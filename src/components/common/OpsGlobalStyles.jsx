@@ -2,10 +2,8 @@
  * OpsGlobalStyles — premium animation system and shared utility classes.
  * Injects keyframes, refined hover states, and smooth interactions.
  *
- * BUG FIX: Added global `input, textarea, select` color rules.
- * When components were converted from `inputSx` (which included `color: T.text`)
- * to Tailwind classes, some forgot `text-[#e8ddc8]`. The browser default is
- * black text, making inputs invisible on dark backgrounds.
+ * UPDATED: Rewrote all colors for the nature-inspired light theme.
+ * All input/focus/scrollbar/hover styles now use warm ivory + forest green palette.
  */
 import { T } from "../../constants/theme.js";
 
@@ -16,7 +14,6 @@ export default function OpsGlobalStyles() {
       * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 
       /* ── Global input text color fix ────────────────────────────────────── */
-      /* Prevents black text on dark backgrounds after Tailwind conversion     */
       input, textarea, select {
         color: ${T.text};
         background: ${T.bgInput};
@@ -26,11 +23,11 @@ export default function OpsGlobalStyles() {
         color: ${T.muted};
         opacity: 1;
       }
-      /* datetime-local and time inputs need explicit dark color-scheme */
+      /* Light theme — use light color-scheme for date/time inputs */
       input[type="datetime-local"],
       input[type="time"],
       input[type="date"] {
-        color-scheme: dark;
+        color-scheme: light;
       }
 
       /* ── Keyframes ──────────────────────────────────────────────────────── */
@@ -58,14 +55,14 @@ export default function OpsGlobalStyles() {
         to { transform:rotate(360deg); }
       }
       @keyframes opsGlow {
-        0%,100% { box-shadow: 0 0 0 0 rgba(200,168,74,0); }
-        50%      { box-shadow: 0 0 12px 3px rgba(200,168,74,0.15); }
+        0%,100% { box-shadow: 0 0 0 0 rgba(42,96,72,0); }
+        50%      { box-shadow: 0 0 12px 3px rgba(42,96,72,0.12); }
       }
 
       /* ── Focus states ───────────────────────────────────────────────────── */
       .ops-focus:focus {
         border-color: ${T.gold} !important;
-        box-shadow: 0 0 0 3px ${T.goldDim}, 0 1px 2px rgba(0,0,0,0.3) !important;
+        box-shadow: 0 0 0 3px ${T.goldDim}, 0 1px 2px rgba(0,0,0,0.06) !important;
         outline: none;
         background: ${T.bgInput} !important;
         color: ${T.text} !important;
@@ -83,8 +80,8 @@ export default function OpsGlobalStyles() {
         position: relative;
       }
       .ops-row:hover {
-        background: rgba(200,168,74,0.03) !important;
-        box-shadow: inset 3px 0 0 rgba(200,168,74,0.4) !important;
+        background: rgba(42,96,72,0.04) !important;
+        box-shadow: inset 3px 0 0 rgba(42,96,72,0.3) !important;
       }
       .ops-row:hover td:first-child { color: ${T.gold}; }
 
@@ -105,14 +102,14 @@ export default function OpsGlobalStyles() {
       }
       .ops-fcard:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 28px rgba(0,0,0,0.45);
+        box-shadow: 0 8px 28px rgba(0,0,0,0.08);
       }
       .ops-fcard:active { transform: translateY(-1px) scale(.99); }
 
       /* ── Update/action row buttons ──────────────────────────────────────── */
       .ops-upd { transition: all 0.15s ease !important; }
       .ops-upd:hover {
-        background: rgba(240,160,36,.18) !important;
+        background: rgba(143,66,12,.1) !important;
         border-color: ${T.amber} !important;
         transform: scale(1.04);
       }
@@ -120,7 +117,7 @@ export default function OpsGlobalStyles() {
 
       .ops-del { transition: all 0.15s ease !important; }
       .ops-del:hover {
-        background: rgba(220,82,82,.18) !important;
+        background: rgba(184,48,48,.08) !important;
         border-color: ${T.red}  !important;
         color: ${T.red}          !important;
       }
@@ -131,11 +128,11 @@ export default function OpsGlobalStyles() {
       /* ── Scrollbar ──────────────────────────────────────────────────────── */
       ::-webkit-scrollbar         { width: 4px; height: 4px; }
       ::-webkit-scrollbar-thumb   {
-        background:    rgba(200,168,74,0.2);
+        background:    rgba(42,96,72,0.15);
         border-radius: 99px;
         transition:    background 0.2s;
       }
-      ::-webkit-scrollbar-thumb:hover { background: rgba(200,168,74,0.4); }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(42,96,72,0.3); }
       ::-webkit-scrollbar-track  { background: transparent; }
 
       /* ── Select options ─────────────────────────────────────────────────── */

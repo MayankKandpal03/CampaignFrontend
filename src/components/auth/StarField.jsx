@@ -1,18 +1,18 @@
 /**
- * StarField — animated star background for the Login page.
- * Extracted from LoginPage where it was defined inline (~30 lines).
+ * LeafField — animated botanical background for the Login page.
+ * Replaces the dark star field with floating leaf-like particles.
  * Memoised to prevent re-renders on parent state changes.
  */
 import { memo } from "react";
 
-const STARS = Array.from({ length: 140 }, (_, i) => ({
+const PARTICLES = Array.from({ length: 60 }, (_, i) => ({
   id:       i,
-  size:     Math.random() * 2.2 + 0.4,
+  size:     Math.random() * 6 + 2,
   top:      Math.random() * 100,
   left:     Math.random() * 100,
-  opacity:  Math.random() * 0.75 + 0.15,
-  delay:    Math.random() * 6,
-  duration: Math.random() * 4 + 2.5,
+  opacity:  Math.random() * 0.25 + 0.05,
+  delay:    Math.random() * 8,
+  duration: Math.random() * 6 + 4,
 }));
 
 export const StarField = memo(() => (
@@ -20,17 +20,18 @@ export const StarField = memo(() => (
     className="fixed inset-0 overflow-hidden pointer-events-none z-0"
     aria-hidden="true"
   >
-    {STARS.map(s => (
+    {PARTICLES.map(p => (
       <div
-        key={s.id}
-        className="absolute rounded-full bg-white will-change-[opacity,transform]"
+        key={p.id}
+        className="absolute rounded-full will-change-[opacity,transform]"
         style={{
-          width:     s.size,
-          height:    s.size,
-          top:       `${s.top}%`,
-          left:      `${s.left}%`,
-          opacity:   s.opacity,
-          animation: `twinkle ${s.duration}s ${s.delay}s ease-in-out infinite alternate`,
+          width:      p.size,
+          height:     p.size,
+          top:        `${p.top}%`,
+          left:       `${p.left}%`,
+          opacity:    p.opacity,
+          background: p.id % 3 === 0 ? "#2a6048" : p.id % 3 === 1 ? "#8a8475" : "#b8974a",
+          animation:  `twinkle ${p.duration}s ${p.delay}s ease-in-out infinite alternate`,
         }}
       />
     ))}
@@ -40,7 +41,6 @@ StarField.displayName = "StarField";
 
 /**
  * Spinner — SVG loading spinner used inside the Login button.
- * Extracted from LoginPage where it was defined inline.
  */
 export const Spinner = memo(() => (
   <svg

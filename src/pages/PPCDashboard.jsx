@@ -1,12 +1,6 @@
 /**
- * PPCDashboard — Tailwind CSS refactor.
- * All static layout/color/spacing converted to Tailwind arbitrary values.
- * Inline style kept only for:
- *  - `pad` (dynamic mobile/desktop padding)
- *  - table-row backgrounds (index-based)
- *  - per-campaign dynamic colors (ticketColor, canUpdate)
- *  - thead row (rgba dynamic string)
- *  - mobile filter button active state
+ * PPCDashboard — Nature-inspired light theme.
+ * All business logic, state management, and API calls unchanged.
  */
 import { useEffect, useState, useCallback, useMemo } from "react";
 import useAuthStore  from "../stores/useAuthStore.js";
@@ -14,7 +8,7 @@ import useNotifStore from "../stores/useNotificationStore.js";
 import { useResponsive }            from "../hooks/useResponsive.js";
 import { useCampaigns }             from "../hooks/useCampaigns.js";
 import { useLogout }                from "../hooks/useLogout.js";
-import { T, inputSx }              from "../constants/theme.js";
+import { T }              from "../constants/theme.js";
 import { STATUS_META, ACTION_META } from "../constants/statusMeta.js";
 import { FILTER_CARDS }             from "../constants/filterCards.js";
 import { fmt, toLocalISO, localToUTC } from "../utils/formatters.js";
@@ -33,15 +27,14 @@ import UpdateModal      from "../components/campaigns/UpdateModal.jsx";
 const COLS = ["Message", "Requested Time", "Status", "PM Action", "Ticket State"];
 
 const Th = ({ children }) => (
-  <th className="px-4 py-2.5 text-left text-[8.5px] font-semibold text-[#706658] tracking-[0.14em] font-['Cinzel',serif] uppercase whitespace-nowrap">
+  <th className="px-4 py-2.5 text-left text-[8.5px] font-semibold text-[#8a8475] tracking-[0.14em] font-['Fraunces',serif] uppercase whitespace-nowrap">
     {children}
   </th>
 );
 
-// Shared input class replacing inputSx — keeps the text visible (bug fix)
 const INPUT_CLS =
-  "ops-focus w-full box-border bg-[#0a0908] border border-[#2e2c22] rounded-lg " +
-  "text-[#e8ddc8] text-[13px] px-[14px] py-[11px] outline-none " +
+  "ops-focus w-full box-border bg-[#faf8f5] border border-[#e8e5de] rounded-lg " +
+  "text-[#2d2a24] text-[13px] px-[14px] py-[11px] outline-none " +
   "font-['DM_Sans',sans-serif] transition-[border-color,box-shadow] duration-200";
 
 export default function PPCDashboard() {
@@ -73,7 +66,7 @@ export default function PPCDashboard() {
       new Date(c.scheduleAt).getTime() > now &&
       new Date(c.scheduleAt).getTime() <= currentReal
     );
-    if (justFired) { setNow(currentReal); return; }
+    if (justFired) { setTimeout(() => setNow(currentReal), 0); return; }
     const nextTime = campaigns
       .filter(c => c.scheduleAt)
       .map(c => new Date(c.scheduleAt).getTime())
@@ -158,11 +151,11 @@ export default function PPCDashboard() {
   const pad = isMobile ? "16px 14px" : "22px 28px";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0c0b08] text-[#e8ddc8] font-['DM_Sans',sans-serif]">
+    <div className="flex h-screen overflow-hidden bg-[#faf8f4] text-[#2d2a24] font-['DM_Sans',sans-serif]">
       <OpsGlobalStyles/>
 
       {isMobile && sidebarOpen && (
-        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-7999 bg-black/75 backdrop-blur-sm" />
+        <div onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-7999 bg-black/20 backdrop-blur-sm" />
       )}
 
       <DashboardSidebar
@@ -180,7 +173,7 @@ export default function PPCDashboard() {
         />
 
         {pageError && (
-          <div className="mx-7 mt-4 px-4 py-2.75 bg-[rgba(224,82,82,0.12)] border border-[#e0525244] rounded-lg text-[#e05252] text-xs">
+          <div className="mx-7 mt-4 px-4 py-2.75 bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] rounded-lg text-[#b83030] text-xs">
             {pageError}
           </div>
         )}
@@ -200,7 +193,7 @@ export default function PPCDashboard() {
                   border:`1px solid ${filtersOpen ? T.gold : T.subtle}`,
                   color: filtersOpen ? T.gold : T.muted,
                   fontSize:9, letterSpacing:"0.14em",
-                  fontFamily:"'Cinzel',serif", textTransform:"uppercase", transition:"all .18s ease",
+                  fontFamily:"'Fraunces',serif", textTransform:"uppercase", transition:"all .18s ease",
                 }}
               >
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -215,7 +208,7 @@ export default function PPCDashboard() {
               onSelect={handleFilterSelect} isMobile={isMobile} visible={!isMobile || filtersOpen}
             />
 
-            <div className="bg-[#141310] border border-[#2e2c22] rounded-[10px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.3)] flex-1 flex flex-col min-h-0">
+            <div className="bg-white border border-[#e8e5de] rounded-[10px] overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.06)] flex-1 flex flex-col min-h-0">
               <TableToolbar
                 title="MY TASKS" count={filtered.length} search={searchQuery} onSearch={setSearchQuery}
                 activeFilter={statusFilter} onClearFilter={() => setStatusFilter(null)} isMobile={isMobile}
@@ -223,8 +216,8 @@ export default function PPCDashboard() {
 
               <div className="flex-1 overflow-auto min-h-0">
                 {loading ? (
-                  <div className="py-14 px-5 text-center text-[#7a7060]">
-                    <div className="w-8 h-8 rounded-full border-2 border-[#2e2c22] border-t-[#c9a42a] mx-auto mb-3.5 animate-[opsSpinner_0.8s_linear_infinite]" />
+                  <div className="py-14 px-5 text-center text-[#8a8475]">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#e8e5de] border-t-[#2a6048] mx-auto mb-3.5 animate-[opsSpinner_0.8s_linear_infinite]" />
                     <p className="m-0 text-[13px]">Loading…</p>
                   </div>
                 ) : filtered.length === 0 ? (
@@ -236,7 +229,7 @@ export default function PPCDashboard() {
                 ) : (
                   <table className="w-full border-collapse min-w-155">
                     <thead className="sticky top-0 z-1">
-                      <tr style={{ borderBottom:`1px solid ${T.subtle}`, background:`${T.bg}ee` }}>
+                      <tr style={{ borderBottom:"1px solid #e8e5de", background:"#f8f7f4" }}>
                         {COLS.map(h => <Th key={h}>{h}</Th>)}
                       </tr>
                     </thead>
@@ -263,15 +256,15 @@ export default function PPCDashboard() {
                           <tr
                             key={c._id}
                             className="ops-row"
-                            style={{ borderBottom:`1px solid ${T.subtle}22`, background: i%2===1 ? `${T.bgCard}80` : "transparent" }}
+                            style={{ borderBottom:"1px solid #e8e5de", background: i%2===1 ? "#f8f7f4" : "transparent" }}
                           >
                             <td className="p-[13px_16px] min-w-50 max-w-85">
-                              <p className="m-0 text-xs text-[#e8ddc8] leading-[1.6] wrap-break-word whitespace-pre-wrap">
+                              <p className="m-0 text-xs text-[#2d2a24] leading-[1.6] wrap-break-word whitespace-pre-wrap">
                                 {c.message}
                               </p>
                             </td>
                             <td className="p-[13px_16px] whitespace-nowrap">
-                              <span className="text-[11px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
+                              <span className="text-[11px] text-[#8a8475] font-['JetBrains_Mono',monospace]">
                                 {fmt(c.requestedAt)}
                               </span>
                             </td>
@@ -284,13 +277,13 @@ export default function PPCDashboard() {
                             <td className="p-[13px_16px] whitespace-nowrap">
                               {canUpdate ? (
                                 <button
-                                  className="ops-upd px-3 py-1 rounded-full bg-[rgba(240,160,48,0.11)] border border-[#f0a03044] text-[#f0a030] text-[9px] font-bold tracking-widest cursor-pointer font-['Cinzel',serif] uppercase"
+                                  className="ops-upd px-3 py-1 rounded-full bg-[rgba(143,66,12,0.08)] border border-[rgba(143,66,12,0.18)] text-[#8f420c] text-[9px] font-bold tracking-widest cursor-pointer font-['Fraunces',serif] uppercase"
                                   onClick={() => setUpdateTarget(c)}
                                 >
                                   Update
                                 </button>
                               ) : (
-                                <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:9, letterSpacing:"0.1em", fontWeight:700, color:ticketColor, fontFamily:"'Cinzel',serif", textTransform:"uppercase" }}>
+                                <span style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:9, letterSpacing:"0.1em", fontWeight:700, color:ticketColor, fontFamily:"'Fraunces',serif", textTransform:"uppercase" }}>
                                   <span style={{ width:4, height:4, borderRadius:"50%", background:ticketColor }}/>
                                   {ticketLabel}
                                 </span>
@@ -305,12 +298,12 @@ export default function PPCDashboard() {
               </div>
 
               {!loading && filtered.length > 0 && (
-                <div className="px-4.5-py-2.25rder-t border-[#2e2c2222] flex justify-between bg-[rgba(12,11,8,0.6)] shrink-0">
-                  <span className="text-[9px] text-[#7a7060] font-['JetBrains_Mono',monospace]">
+                <div className="px-4.5 py-2.25 border-t border-[#e8e5de] flex justify-between bg-[#f8f7f4] shrink-0">
+                  <span className="text-[9px] text-[#8a8475] font-['JetBrains_Mono',monospace]">
                     {filtered.length} of {campaigns.length} tasks
                   </span>
-                  <span className="text-[9px] text-[#2e2c22] font-['JetBrains_Mono',monospace] flex items-center gap-1.25">
-                    <span className="w-1 h-1 rounded-full bg-[#4cbb7f] animate-[opsPulse_2s_infinite]"/>
+                  <span className="text-[9px] text-[#8a8475] font-['JetBrains_Mono',monospace] flex items-center gap-1.25">
+                    <span className="w-1 h-1 rounded-full bg-[#2a6048] animate-[opsPulse_2s_infinite]"/>
                     Live updates active
                   </span>
                 </div>
@@ -324,32 +317,32 @@ export default function PPCDashboard() {
           <div style={{ padding: pad }} className="flex-1">
             <div className="max-w-140">
               {/* Team status indicator */}
-              <div className={`flex items-center gap-2.5 p-[10px_16px] mb-5 bg-[#141310] rounded-lg border ${teamId ? "border-[#2e2c22]" : "border-[#e0525244]"}`}>
+              <div className={`flex items-center gap-2.5 p-[10px_16px] mb-5 bg-white rounded-lg border ${teamId ? "border-[#e8e5de]" : "border-[rgba(184,48,48,0.2)]"}`}>
                 <span style={{ width:7, height:7, borderRadius:"50%", flexShrink:0, background: teamId ? T.green : T.red, boxShadow: teamId ? `0 0 8px ${T.green}` : "none" }}/>
-                <span className={`text-xs font-['JetBrains_Mono',monospace] ${teamId ? "text-[#7a7060]" : "text-[#e05252]"}`}>
+                <span className={`text-xs font-['JetBrains_Mono',monospace] ${teamId ? "text-[#8a8475]" : "text-[#b83030]"}`}>
                   {teamId ? "Team assigned ✓" : "No team assigned — contact your manager"}
                 </span>
               </div>
 
               {/* Form card */}
               <div
-                className="bg-[#141310] border border-[#2e2c22] rounded-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.3)]"
+                className="bg-white border border-[#e8e5de] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
                 style={{ padding: isMobile ? "22px 18px" : "28px 28px 24px" }}
               >
-                <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(200,168,74,0.6)] font-['Cinzel',serif] uppercase">
+                <p className="m-0 mb-1 text-[8px] tracking-[0.22em] text-[rgba(42,96,72,0.6)] font-['Fraunces',serif] uppercase">
                   New Request
                 </p>
-                <h2 className="m-0 mb-5.5 text-lg font-semibold text-[#f5edd8] font-['Cinzel',serif]">
+                <h2 className="m-0 mb-5.5 text-lg font-semibold text-[#1a1810] font-['Fraunces',serif]">
                   Create Task
                 </h2>
 
                 {createError && (
-                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(224,82,82,0.12)] border border-[#e0525244] text-[#e05252] text-xs">
+                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(184,48,48,0.06)] border border-[rgba(184,48,48,0.15)] text-[#b83030] text-xs">
                     {createError}
                   </div>
                 )}
                 {createOk && (
-                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(76,187,127,0.11)] border border-[#4cbb7f44] text-[#4cbb7f] text-xs flex items-center gap-2">
+                  <div className="px-3.5 py-2.5 rounded-lg mb-4.5 bg-[rgba(42,96,72,0.08)] border border-[rgba(42,96,72,0.15)] text-[#2a6048] text-xs flex items-center gap-2">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                     Task submitted successfully
                   </div>
@@ -370,11 +363,12 @@ export default function PPCDashboard() {
                     <input
                       type="datetime-local"
                       className={INPUT_CLS}
+                      style={{ colorScheme: "light" }}
                       value={createForm.requestedAt}
                       onChange={e => setCreateForm(f => ({ ...f, requestedAt: e.target.value }))}
                     />
                   </Field>
-                  <div className="border-t border-[#2e2c22] pt-5 mt-1.5">
+                  <div className="border-t border-[#e8e5de] pt-5 mt-1.5">
                     <GoldBtn type="submit" disabled={creating || !teamId} style={{ width:"100%", padding:"13px" }}>
                       {creating ? "Submitting…" : !teamId ? "No Team Assigned" : "Submit Task"}
                     </GoldBtn>

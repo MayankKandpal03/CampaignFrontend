@@ -1,5 +1,6 @@
 /**
- * DiamondLogo — premium brand SVG mark.
+ * DiamondLogo → LeafLogo — nature-inspired botanical brand SVG mark.
+ * Replaced diamond with a stylized leaf icon matching the Ayurvedic theme.
  */
 
 export default function DiamondLogo({ size = 34 }) {
@@ -11,25 +12,36 @@ export default function DiamondLogo({ size = 34 }) {
       fill="none"
       aria-hidden="true"
     >
-      <polygon
-        points="18,3 33,18 18,33 3,18"
-        fill="none"
-        stroke="#c9a42a"
-        strokeWidth="1.6"
+      {/* Outer leaf shape */}
+      <path
+        d="M18 4 C26 8, 30 16, 28 24 C26 30, 20 34, 18 34 C16 34, 10 30, 8 24 C6 16, 10 8, 18 4Z"
+        fill="rgba(42,96,72,0.08)"
+        stroke="#2a6048"
+        strokeWidth="1.2"
         strokeLinejoin="round"
       />
-      <polygon
-        points="18,9 28,18 18,27 8,18"
-        fill="rgba(201,164,42,0.13)"
-        stroke="rgba(201,164,42,0.20)"
+      {/* Center vein */}
+      <path
+        d="M18 8 L18 30"
+        stroke="rgba(42,96,72,0.25)"
         strokeWidth="0.8"
-        strokeLinejoin="round"
+        strokeLinecap="round"
       />
-      <polygon
-        points="18,14 22,18 18,22 14,18"
-        fill="#c9a42a"
-        opacity="0.9"
+      {/* Side veins */}
+      <path
+        d="M18 14 L12 18 M18 18 L11 22 M18 22 L13 25"
+        stroke="rgba(42,96,72,0.18)"
+        strokeWidth="0.6"
+        strokeLinecap="round"
       />
+      <path
+        d="M18 14 L24 18 M18 18 L25 22 M18 22 L23 25"
+        stroke="rgba(42,96,72,0.18)"
+        strokeWidth="0.6"
+        strokeLinecap="round"
+      />
+      {/* Center dot */}
+      <circle cx="18" cy="12" r="1.5" fill="#2a6048" opacity="0.6" />
     </svg>
   );
 }

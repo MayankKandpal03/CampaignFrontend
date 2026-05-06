@@ -347,7 +347,7 @@ export default function ITDashboard() {
       new Date(c.scheduleAt).getTime() > now &&
       new Date(c.scheduleAt).getTime() <= currentReal
     );
-    if (justFired) { setNow(currentReal); return; }
+    if (justFired) { setTimeout(() => setNow(currentReal), 0); return; }
     const nextTime = campaigns
       .filter(c => c.scheduleAt)
       .map(c => new Date(c.scheduleAt).getTime())

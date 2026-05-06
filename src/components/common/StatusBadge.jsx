@@ -12,7 +12,7 @@ export function StatusBadge({ value, meta = STATUS_META }) {
   };
   return (
     <span
-      className="inline-flex items-center gap-1.25 px-2.25 py-0.75 rounded-full text-[9.5px] font-semibold tracking-widest font-['Cinzel',serif] whitespace-nowrap uppercase"
+      className="inline-flex items-center gap-1.25 px-2.25 py-0.75 rounded-full text-[9.5px] font-semibold tracking-widest font-['Fraunces',serif] whitespace-nowrap uppercase"
       style={{
         background: m.bg,
         color: m.color,

@@ -5,6 +5,8 @@
  *
  * Call this once per app session (e.g. in main.jsx or App.jsx) or
  * use the hook version `useFontLoader` from hooks/.
+ *
+ * UPDATED: Cinzel → Fraunces to match the nature/botanical aesthetic.
  */
 export const injectOpsFonts = () => {
   if (document.getElementById("ops-fonts")) return;
@@ -12,7 +14,8 @@ export const injectOpsFonts = () => {
   link.id   = "ops-fonts";
   link.rel  = "stylesheet";
   link.href =
-    "https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700" +
+    "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;" +
+    "0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,300" +
     "&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400" +
     "&family=JetBrains+Mono:wght@400;500&display=swap";
   document.head.appendChild(link);

@@ -1,2 +1,17 @@
 @import "tailwindcss";
 
+/* ── Nature-Inspired Ayurvedic Theme — Base Styles ──────────────────────── */
+
+body {
+  background: #faf8f4;
+  color: #2d2a24;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent FOUC — ensure light scheme */
+html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
